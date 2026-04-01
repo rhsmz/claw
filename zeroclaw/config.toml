@@ -1,0 +1,683 @@
+# =============================================================================
+# ZeroClaw Enterprise Configuration - The Sovereign 64
+# =============================================================================
+
+[server]
+port = 42617
+log_level = "info"
+audit_log = true # 全操作の監査ログを記録
+
+[storage]
+provider = "postgres"
+url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}"
+max_connections = 350 # 64名のエージェントと並列解析プロセスを支える
+
+[llm]
+provider = "openai"
+base_url = "http://litellm:4000/v1"
+api_key = "${LITELLM_MASTER_KEY}"
+model = "${DEFAULT_MODEL}"
+timeout_sec = 900 # 長大な法務監査や多言語コンパイル時間を考慮
+max_retries = 3
+
+[mcp]
+enabled = true
+url = "http://mcp-gateway:8811/sse"
+tool_timeout_sec = 300
+
+# =============================================================================
+# 1. 経営・プロダクト戦略部 (Management & Vision: 9名)
+# =============================================================================
+
+[[crews]]
+name = "product_manager"
+description = "市場価値とユーザー体験の最大化に責任を持つプロダクトの総帥。"
+prompt_file = "prompts/product_manager.md"
+skills = ["market_research", "logical_reasoning", "knowledge_base", "time_management"]
+temperature = 0.7
+
+[[crews]]
+name = "ux_researcher"
+description = "市場調査、競合分析、ユーザー行動予測に基づき、UXの妥当性を評価。"
+prompt_file = "prompts/ux_researcher.md"
+skills = ["market_research", "ui_inspection", "doc_parsing", "knowledge_base"]
+temperature = 0.2
+
+[[crews]]
+name = "mobile_market_strategist"
+description = "【攻め：モバイル】OS新機能活用と、アプリストアで勝つためのUX戦略立案。"
+prompt_file = "prompts/mobile_strategist.md"
+skills = ["market_research", "academic_research", "knowledge_base"]
+temperature = 0.6
+
+[[crews]]
+name = "platform_policy_liaison"
+description = "【守り：リジェクト回避】Apple/Googleの規約変更を監視し、企画段階でリスクを排除。"
+prompt_file = "prompts/policy_liaison.md"
+skills = ["doc_parsing", "knowledge_base", "platform_guideline_scraper"]
+temperature = 0.0
+
+[[crews]]
+name = "planner"
+description = "ビジネス要求を具体的な要件定義とユーザーストーリーに落とし込む。"
+prompt_file = "prompts/planner.md"
+skills = ["market_research", "logical_reasoning", "diagram_generation", "knowledge_base"]
+temperature = 0.5
+
+[[crews]]
+name = "project_manager"
+description = "納期・予算・リソース管理の総責任者。最終的な意思決定とデプロイ判断。"
+prompt_file = "prompts/pm.md"
+skills = ["github_api", "team_notify_discord", "logical_reasoning", "time_management"]
+temperature = 0.1
+
+[[crews]]
+name = "cto"
+description = "技術総帥。多言語選定、アーキテクチャ設計、開発部隊の指揮・監督。"
+prompt_file = "prompts/cto.md"
+skills = ["github_api", "logical_reasoning", "academic_research", "diagram_generation", "cloud_compute", "knowledge_base"]
+temperature = 0.1
+
+[[crews]]
+name = "pmo_logic"
+description = "【男性視点PMO】数値と構造に基づくリスク分析。プロジェクト進捗の冷徹な監視。"
+prompt_file = "prompts/pmo_logic.md"
+skills = ["github_api", "logical_reasoning", "time_management"]
+temperature = 0.0
+
+[[crews]]
+name = "pmo_empathy"
+description = "【女性視点PMO】チーム士気、調和、心理的安全性の管理と潤滑油的役割。"
+prompt_file = "prompts/pmo_empathy.md"
+skills = ["team_notify_slack", "wiki_management", "time_management"]
+temperature = 0.3
+
+# =============================================================================
+# 1.2 法務・コンプライアンス部 (The LEGAL Pod: 5名)
+# =============================================================================
+
+[[crews]]
+name = "general_counsel"
+description = "【統括】法務戦略の総責任者。法的リスクとビジネスの整合性を最終判断。"
+prompt_file = "prompts/general_counsel.md"
+skills = ["legal_research", "doc_parsing", "knowledge_base"]
+temperature = 0.1
+
+[[crews]]
+name = "ip_trademark_specialist"
+description = "【攻め：権利】特許、商標、著作権の確保と他社権利の侵害調査。"
+prompt_file = "prompts/ip_specialist.md"
+skills = ["ip_search", "market_research", "knowledge_base"]
+temperature = 0.3
+
+[[crews]]
+name = "contract_architect"
+description = "【守り：契約】利用規約、EULA、SLA、パートナー契約の策定と厳格な査読。"
+prompt_file = "prompts/contract_architect.md"
+skills = ["doc_parsing", "legal_research", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "privacy_sovereign"
+description = "【守り：データ】GDPR/個人情報保護法遵守。データフローの適法性監査。"
+prompt_file = "prompts/privacy_officer.md"
+skills = ["doc_parsing", "logical_reasoning", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "legal_risk_simulator"
+description = "【監査：RedTeam】訴訟リスクのシミュレーションと証拠保全・防御策立案。"
+prompt_file = "prompts/legal_redteam.md"
+skills = ["logical_reasoning", "academic_research", "legal_research"]
+temperature = 0.4
+
+# =============================================================================
+# 1.3 情報セキュリティ対策・技術調査部 (The INTEL Pod: 4名)
+# =============================================================================
+
+[[crews]]
+name = "tech_trend_scout"
+description = "【攻め：技術調査】最新の技術動向、AI/言語仕様を収集しWikiを拡充。"
+prompt_file = "prompts/tech_scout.md"
+skills = ["market_research", "academic_research", "wiki_management", "knowledge_base"]
+temperature = 0.8
+
+[[crews]]
+name = "security_intel_analyst"
+description = "【守り：脅威監視】重大事案、CVE、ゼロデイ攻撃を監視しWikiに緊急対策を公開。"
+prompt_file = "prompts/security_intel.md"
+skills = ["web_search", "vuln_scan", "wiki_management", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "compliance_wiki_editor"
+description = "【整理：標準化】法務・技術規約を「生きたナレッジ」としてWikiに集約。"
+prompt_file = "prompts/wiki_editor.md"
+skills = ["wiki_management", "enterprise_docs", "doc_parsing", "knowledge_base"]
+temperature = 0.1
+
+[[crews]]
+name = "incident_response_advisor"
+description = "【緊急：指示】事案発生時にWikiをベースに即座に対策ロードマップを提示。"
+prompt_file = "prompts/incident_advisor.md"
+skills = ["team_notify", "logical_reasoning", "knowledge_base", "time_management"]
+temperature = 0.0
+
+# =============================================================================
+# 1.5 設計・アーキテクチャ部 (The DESIGN Pod: 6名)
+# =============================================================================
+
+[[crews]]
+name = "system_architect"
+description = "【統括】全体システム構造の策定と整合性維持。設計思想の番人。"
+prompt_file = "prompts/sys_architect.md"
+skills = ["logical_reasoning", "diagram_generation", "knowledge_base", "academic_research"]
+temperature = 0.2
+
+[[crews]]
+name = "api_interface_designer"
+description = "【攻め：外部設計】OpenAPI/gRPC/GraphQLスキーマの設計と標準化。"
+prompt_file = "prompts/api_designer.md"
+skills = ["logical_reasoning", "diagram_generation", "api_spec_manager", "api_testing"]
+temperature = 0.4
+
+[[crews]]
+name = "data_modeling_expert"
+description = "【守り：内部設計】ER図、データ正規化、整合性維持の設計。"
+prompt_file = "prompts/data_modeler.md"
+skills = ["db_operation", "diagram_generation", "knowledge_base"]
+temperature = 0.1
+
+[[crews]]
+name = "ui_logic_architect"
+description = "【攻め：フロント設計】状態管理、コンポーネント構成、疎結合なUIロジック設計。"
+prompt_file = "prompts/ui_architect.md"
+skills = ["ui_inspection", "logical_reasoning", "diagram_generation"]
+temperature = 0.3
+
+[[crews]]
+name = "security_design_specialist"
+description = "【守り：堅牢設計】認証フロー、ゼロトラスト、機密情報管理(Vault)の設計。"
+prompt_file = "prompts/security_design.md"
+skills = ["vuln_scan", "secret_vault", "doc_parsing", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "technical_spec_reviewer"
+description = "【監査：品質】設計矛盾、実装不可能性、エッジケース漏れの厳格査読。"
+prompt_file = "prompts/spec_reviewer.md"
+skills = ["logical_reasoning", "doc_parsing", "knowledge_base"]
+temperature = 0.0
+
+# =============================================================================
+# 2. 開発・構築部 (The BUILD Unit: 27名)
+# =============================================================================
+
+# --- A. クライアントサイド Pod (JS/TS 専門: 8名) ---
+[[crews]]
+name = "client_lead"
+description = "【攻め：実装】Next.js/React等の最新スタックを用いたフロントエンド実装。"
+prompt_file = "prompts/client_lead.md"
+skills = ["filesystem", "github_api", "runtime_js"]
+temperature = 0.2
+
+[[crews]]
+name = "ui_ux_specialist"
+description = "【守り：体験】デザイン整合性、WAI-ARIA準拠、UX品質の番人。"
+prompt_file = "prompts/ui_ux_spec.md"
+skills = ["ui_inspection", "knowledge_base"]
+temperature = 0.1
+
+[[crews]]
+name = "js_ts_wizard"
+description = "【攻め：言語極振】最新ECMAScript仕様、高度な型推論、V8最適化の実装。"
+prompt_file = "prompts/js_wizard.md"
+skills = ["runtime_js", "logical_reasoning", "academic_research"]
+temperature = 0.5
+
+[[crews]]
+name = "js_ts_guardian"
+description = "【守り：言語極振】XSS、Prototype汚染、非同期リーク等の言語特有バグ排除。"
+prompt_file = "prompts/js_guardian.md"
+skills = ["linter_js", "runtime_js", "error_monitoring"]
+temperature = 0.0
+
+[[crews]]
+name = "client_pr_optimizer"
+description = "【攻め：レビュー】JSパフォーマンス、リファクタ、最新API活用を提案。"
+prompt_file = "prompts/client_rev_opt.md"
+skills = ["github_api", "logical_reasoning", "code_interpreter"]
+temperature = 0.3
+
+[[crews]]
+name = "client_pr_standardizer"
+description = "【守り：レビュー】コーディング規約、型安全、保守性の厳格審査。"
+prompt_file = "prompts/client_rev_std.md"
+skills = ["github_api", "linter_js", "logical_reasoning"]
+temperature = 0.0
+
+[[crews]]
+name = "client_test_dev"
+description = "【攻め：検証】Jest/Playwright/Cypressによるテスト実装。"
+prompt_file = "prompts/client_test_dev.md"
+skills = ["filesystem", "runtime_js", "code_interpreter"]
+temperature = 0.0
+
+[[crews]]
+name = "visual_regression_tester"
+description = "【守り：安定】VRTツールを用いた表示崩れと互換性の厳格検証。"
+prompt_file = "prompts/client_test_ops.md"
+skills = ["ui_inspection", "filesystem"]
+temperature = 0.0
+
+# --- B. バックエンド Pod (PHP/Go/Rust 専門: 13名) ---
+[[crews]]
+name = "backend_lead"
+description = "【攻め：実装】高効率API、ビジネスロジック、分散処理の実装。"
+prompt_file = "prompts/backend_lead.md"
+skills = ["filesystem", "runtime_backend", "db_operation", "cache_design"]
+temperature = 0.2
+
+[[crews]]
+name = "db_architect"
+description = "【守り：構造】インデックス最適化、スロークエリ排除、整合性監視。"
+prompt_file = "prompts/db_architect.md"
+skills = ["db_operation", "diagram_generation", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "php_artisan"
+description = "【攻め：PHP】最新PHP8+機能、デザインパターンの高度な実装。"
+prompt_file = "prompts/php_artisan.md"
+skills = ["runtime_php", "logical_reasoning"]
+temperature = 0.3
+
+[[crews]]
+name = "php_hardener"
+description = "【守り：PHP】PHPStanによる型安全の強制、セキュアな関数利用の監査。"
+prompt_file = "prompts/php_hardener.md"
+skills = ["linter_php", "runtime_php"]
+temperature = 0.0
+
+[[crews]]
+name = "go_specialist"
+description = "【攻め：Go】Goroutine最適化、チャネル設計、Goらしい高速実装。"
+prompt_file = "prompts/go_spec.md"
+skills = ["runtime_go", "logical_reasoning"]
+temperature = 0.2
+
+[[crews]]
+name = "go_sentinel"
+description = "【守り：Go】デッドロック検知、エラーハンドリング、レースコンディション排除。"
+prompt_file = "prompts/go_sentinel.md"
+skills = ["linter_go", "runtime_go"]
+temperature = 0.0
+
+[[crews]]
+name = "rust_evangelist"
+description = "【攻め：Rust】ライフタイム最適化、ゼロコスト抽象化、高並列処理。"
+prompt_file = "prompts/rust_eva.md"
+skills = ["runtime_rust", "logical_reasoning", "academic_research"]
+temperature = 0.2
+
+[[crews]]
+name = "rust_governor"
+description = "【守り：Rust】Unsafe監視、コンパイルエラー事前回避、メモリ安全死守。"
+prompt_file = "prompts/rust_gov.md"
+skills = ["linter_rust", "runtime_rust"]
+temperature = 0.0
+
+[[crews]]
+name = "backend_pr_optimizer"
+description = "【攻め：レビュー】アルゴリズム改善、実行速度向上のリファクタ提案。"
+prompt_file = "prompts/backend_rev_opt.md"
+skills = ["github_api", "logical_reasoning", "code_interpreter"]
+temperature = 0.3
+
+[[crews]]
+name = "backend_pr_securitizer"
+description = "【守り：レビュー】バリデーション、認可、SQLi、メモリ管理の監査。"
+prompt_file = "prompts/backend_rev_std.md"
+skills = ["github_api", "linter_backend", "logical_reasoning"]
+temperature = 0.0
+
+[[crews]]
+name = "api_unit_tester"
+description = "【攻め：検証】各言語による正常系ユニットテスト実装。"
+prompt_file = "prompts/backend_test_dev.md"
+skills = ["filesystem", "runtime_backend", "api_testing", "code_interpreter"]
+temperature = 0.0
+
+[[crews]]
+name = "resilience_tester"
+description = "【守り：安定】タイムアウト、再接続、異常系レスポンスの徹底検証。"
+prompt_file = "prompts/backend_test_ops.md"
+skills = ["error_monitoring", "api_testing", "code_interpreter"]
+temperature = 0.0
+
+[[crews]]
+name = "middleware_tuner"
+description = "【特化】Redis, Elasticsearch, MQの最適設定と接続負荷調整。"
+prompt_file = "prompts/middleware_tuner.md"
+skills = ["cache_design", "db_operation", "logical_reasoning"]
+temperature = 0.1
+
+# --- C. インフラ Pod (IaC & Cloud: 6名) ---
+[[crews]]
+name = "infra_lead"
+description = "【攻め：構築】Terraform/CDKを用いたセキュアな自動基盤構築。"
+prompt_file = "prompts/infra_lead.md"
+skills = ["filesystem", "github_api", "cloud_compute", "container_builder"]
+temperature = 0.2
+
+[[crews]]
+name = "sre_engineer"
+description = "【守り：信頼】SLO/SLIの策定、オブザーバビリティ、オートスケール設計。"
+prompt_file = "prompts/sre_engineer.md"
+skills = ["container_orchestration", "error_monitoring", "cloud_compute"]
+temperature = 0.0
+
+[[crews]]
+name = "infra_pr_optimizer"
+description = "【攻め：レビュー】クラウド最適化、デプロイ高速化、コスト削減を提案。"
+prompt_file = "prompts/infra_rev_opt.md"
+skills = ["github_api", "cloud_compute", "logical_reasoning"]
+temperature = 0.3
+
+[[crews]]
+name = "infra_pr_hardener"
+description = "【守り：レビュー】IAM最小権限、通信暗号化、セキュリティ設定の監査。"
+prompt_file = "prompts/infra_rev_std.md"
+skills = ["github_api", "vuln_scan", "secret_vault"]
+temperature = 0.0
+
+[[crews]]
+name = "iac_validator"
+description = "【攻め：検証】IaC構成の整合性・ポリシー自動テスト。"
+prompt_file = "prompts/infra_test_dev.md"
+skills = ["filesystem", "logical_reasoning", "code_interpreter"]
+temperature = 0.0
+
+[[crews]]
+name = "chaos_tester"
+description = "【守り：安定】障害復旧、バックアップリストア、自動フェイルオーバーの検証。"
+prompt_file = "prompts/infra_test_ops.md"
+skills = ["container_orchestration", "error_monitoring", "code_interpreter"]
+temperature = 0.0
+
+# =============================================================================
+# 3. 結合・検証・運用・監査部 (INTEGRATION & RUN: 11名)
+# =============================================================================
+
+[[crews]]
+name = "integration_lead"
+description = "Pod間連携の最終責任者。E2Eシナリオ完遂と疎通保証。"
+prompt_file = "prompts/integration_lead.md"
+skills = ["filesystem", "github_api", "api_testing", "code_interpreter", "knowledge_base"]
+temperature = 0.2
+
+[[crews]]
+name = "consistency_checker"
+description = "型不一致、非同期競合、API契約違反の執拗な自動検知。"
+prompt_file = "prompts/consistency_checker.md"
+skills = ["error_monitoring", "api_testing", "api_spec_manager"]
+temperature = 0.0
+
+[[crews]]
+name = "contract_test_dev"
+description = "Pact等を用いた契約テストによるインターフェース破壊防止。"
+prompt_file = "prompts/contract_test_dev.md"
+skills = ["filesystem", "runtime_js", "code_interpreter"]
+temperature = 0.0
+
+[[crews]]
+name = "protocol_guardian"
+description = "通信プロトコル、TLS、APIスキーマ変更のセキュリティ監視。"
+prompt_file = "prompts/protocol_guardian.md"
+skills = ["github_api", "vuln_scan", "api_testing"]
+temperature = 0.0
+
+[[crews]]
+name = "human_interface_auditor"
+description = "【攻め：UX品質】HIG/Material Designに基づくリジェクト阻止監査。"
+prompt_file = "prompts/ux_auditor.md"
+skills = ["ui_inspection", "doc_parsing", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "store_submission_gatekeeper"
+description = "【守り：申請代行】メタデータ、プライバシーポリシー、規約遵守の最終査読。"
+prompt_file = "prompts/submission_gatekeeper.md"
+skills = ["doc_parsing", "github_api", "knowledge_base", "web_search"]
+temperature = 0.0
+
+[[crews]]
+name = "release_manager"
+description = "本番デプロイの最終承認権限。デプロイ・ゲートキーパー。"
+prompt_file = "prompts/release_manager.md"
+skills = ["github_api", "team_notify", "error_monitoring", "time_management"]
+temperature = 0.0
+
+[[crews]]
+name = "qa_engineer"
+description = "製品全体のユーザーシナリオテストと破壊的検証の遂行。"
+prompt_file = "prompts/qa_engineer.md"
+skills = ["filesystem", "ui_inspection", "api_testing", "knowledge_base"]
+temperature = 0.0
+
+[[crews]]
+name = "security_auditor"
+description = "脆弱性診断、ペネトレーションテストの最終責任。"
+prompt_file = "prompts/security_auditor.md"
+skills = ["filesystem", "vuln_scan", "github_api", "doc_parsing", "secret_vault"]
+temperature = 0.0
+
+[[crews]]
+name = "grc_officer"
+description = "AI倫理、個人情報、法規制、コンプライアンスの最終チェック。"
+prompt_file = "prompts/grc_officer.md"
+skills = ["market_research", "knowledge_base", "doc_parsing"]
+temperature = 0.0
+
+[[crews]]
+name = "customer_success_analyst"
+description = "【改善提案】運用データ分析に基づき戦略的改善をフィードバック。"
+prompt_file = "prompts/customer_success.md"
+skills = ["error_monitoring", "market_research", "knowledge_base"]
+temperature = 0.4
+
+[[crews]]
+name = "ai_observability_lead"
+description = "LLM品質（ハルシネーション）、コスト、倫理リスクの常時観測。"
+prompt_file = "prompts/ai_monitor.md"
+skills = ["error_monitoring", "logical_reasoning", "academic_research"]
+temperature = 0.0
+
+# =============================================================================
+# 4. 運用・ナレッジ・保守 (3名)
+# =============================================================================
+
+[[crews]]
+name = "devops_assistant"
+description = "CI/CDパイプライン保守、バックアップ、定期メンテナンス自動化。"
+prompt_file = "prompts/devops_assistant.md"
+skills = ["github_api", "team_notify", "error_monitoring", "cloud_compute", "container_builder"]
+temperature = 0.1
+
+[[crews]]
+name = "customer_support"
+description = "ユーザー窓口。製品知識と外部検索を駆使した高度な回答。"
+prompt_file = "prompts/support_engineer.md"
+skills = ["web_search", "knowledge_base", "enterprise_docs"]
+temperature = 0.2
+
+[[crews]]
+name = "technical_writer"
+description = "全工程から高精度なドキュメントとマニュアルを自動生成。"
+prompt_file = "prompts/tech_writer.md"
+skills = ["filesystem", "github_api", "wiki_management", "diagram_generation", "knowledge_base"]
+temperature = 0.1
+
+# =============================================================================
+# Skill Definitions (The Sovereign Arsenal - 39 Skills)
+# =============================================================================
+
+[[skills]]
+name = "knowledge_base"
+mcp_server = "context7" # 過去ログ・社内知見
+
+[[skills]]
+name = "logical_reasoning"
+mcp_server = "sequential-thinking"
+
+[[skills]]
+name = "time_management"
+mcp_server = "time"
+
+[[skills]]
+name = "market_research"
+mcp_server = "brave-search"
+
+[[skills]]
+name = "academic_research"
+mcp_server = "arxiv"
+
+[[skills]]
+name = "web_search"
+mcp_server = "duckduckgo"
+
+[[skills]]
+name = "knowledge_base_lookup"
+mcp_server = "wikipedia"
+
+[[skills]]
+name = "filesystem"
+mcp_server = "filesystem"
+
+[[skills]]
+name = "github_api"
+mcp_server = "github"
+
+[[skills]]
+name = "code_interpreter"
+mcp_server = "python-shell"
+
+[[skills]]
+name = "api_testing"
+mcp_server = "curl-executor"
+
+[[skills]]
+name = "api_spec_manager"
+mcp_server = "openapi-spec-tool"
+
+[[skills]]
+name = "runtime_js"
+mcp_server = "node-runtime"
+
+[[skills]]
+name = "linter_js"
+mcp_server = "eslint-analyzer"
+
+[[skills]]
+name = "runtime_backend"
+mcp_server = "polyglot-sandbox"
+
+[[skills]]
+name = "linter_backend"
+mcp_server = "backend-analyzer"
+
+[[skills]]
+name = "runtime_php"
+mcp_server = "php-runtime"
+
+[[skills]]
+name = "linter_php"
+mcp_server = "phpstan-analyzer"
+
+[[skills]]
+name = "runtime_go"
+mcp_server = "go-runtime"
+
+[[skills]]
+name = "linter_go"
+mcp_server = "golangci-analyzer"
+
+[[skills]]
+name = "runtime_rust"
+mcp_server = "rust-runtime"
+
+[[skills]]
+name = "linter_rust"
+mcp_server = "clippy-analyzer"
+
+[[skills]]
+name = "db_operation"
+mcp_server = "postgres"
+
+[[skills]]
+name = "cache_design"
+mcp_server = "redis"
+
+[[skills]]
+name = "diagram_generation"
+mcp_server = "mermaid-renderer"
+
+[[skills]]
+name = "doc_parsing"
+mcp_server = "pdf-parser"
+
+[[skills]]
+name = "legal_research"
+mcp_server = "legal-database-api"
+
+[[skills]]
+name = "ip_search"
+mcp_server = "trademark-patent-search"
+
+[[skills]]
+name = "platform_guideline_scraper"
+mcp_server = "web-scraper"
+
+[[skills]]
+name = "error_monitoring"
+mcp_server = "sentry"
+
+[[skills]]
+name = "ui_inspection"
+mcp_server = "browserbase"
+
+[[skills]]
+name = "vuln_scan"
+mcp_server = "snyk"
+
+[[skills]]
+name = "secret_vault"
+mcp_server = "hashicorp-vault-mcp"
+
+[[skills]]
+name = "cloud_compute"
+mcp_server = "aws"
+
+[[skills]]
+name = "container_builder"
+mcp_server = "docker-mcp"
+
+[[skills]]
+name = "container_orchestration"
+mcp_server = "kubernetes"
+
+[[skills]]
+name = "team_notify_discord"
+mcp_server = "discord"
+
+[[skills]]
+name = "team_notify_slack"
+mcp_server = "slack"
+
+[[skills]]
+name = "wiki_management"
+mcp_server = "notion"
+
+[[skills]]
+name = "enterprise_docs"
+mcp_server = "confluence"

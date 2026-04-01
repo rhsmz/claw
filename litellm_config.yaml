@@ -1,40 +1,44 @@
-# LiteLLM プロキシ: ローカル Ollama + 任意のクラウド LLM を同一 OpenAI 互換 API に集約し Langfuse にコールバック
-# https://docs.litellm.ai/docs/proxy/configs
-#
-# クラウド系は api_key: os.environ/... のため、docker-compose の litellm に渡す .env 側でキーを設定する。
-# キー未設定のまま当該モデルを呼ぶとリクエスト時にエラーになる（プロキシ起動は通常可能）。
-
 model_list:
-  # --- ローカル Ollama（api_base は compose ネットワーク内ホスト名）---
-  # .env の DEFAULT_MODEL は、ここに列挙した model_name のいずれかに合わせる。
-
-  - model_name: llama3.1
+  # --- 指揮官・アーキテクト用 (最高知能) ---
+  - model_name: grand-logic-model
     litellm_params:
-      model: ollama/llama3.1
-      api_base: http://ollama:11434
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+      rpm: 500
+      timeout: 300
 
-  - model_name: gemma3:12b
+  # --- 開発部隊・ウィザード用 (コーディング特化) ---
+  - model_name: code-master-model
     litellm_params:
-      model: ollama/gemma3:12b
-      api_base: http://ollama:11434
+      model: anthropic/claude-3-5-sonnet-20240620
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 200
 
-  # --- 外部 LLM（.env に API キーを設定したとき利用可能）---
-  - model_name: gpt-4o-mini
+  # --- 調査・スカウト・サポート用 (高速・低コスト) ---
+  - model_name: fast-scout-model
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
+      rpm: 5000
 
-  # モデル ID はプロバイダの最新表記に合わせて更新すること（LiteLLM ドキュメント参照）
-  - model_name: claude-3-5-haiku
+  # --- セキュリティ・法務監査用 (長文コンテキスト) ---
+  - model_name: heavy-audit-model
     litellm_params:
-      model: anthropic/claude-3-5-haiku-20241022
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+      max_tokens: 16384
 
-  - model_name: gemini-2.0-flash
-    litellm_params:
-      model: gemini/gemini-2.0-flash
-      api_key: os.environ/GEMINI_API_KEY
+# ロードバランシングとフォールバックの設定
+router_settings:
+  routing_strategy: usage-based-routing-v2 # 負荷の低いモデルを優先
+  enable_fallbacks: true
+  set_verbose: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY # config.tomlの認証に使用
+  database_url: os.environ/POSTGRES_URL # 使用量統計を記録
 
 litellm_settings:
-  success_callback: ["langfuse"]
-  failure_callback: ["langfuse"]
+  drop_params: true # サポート外のパラメータを自動削除
+  set_verbose: false
+  telemetry: false

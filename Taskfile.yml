@@ -1,134 +1,86 @@
-version: "3"
+version: '3'
 
 vars:
-  COMPOSE: docker compose
-  DEFAULT_MODEL: llama3.1
+  PROJECT_NAME: zeroclaw-enterprise
+  DOCKER_COMPOSE: docker-compose -p {{.PROJECT_NAME}}
 
 tasks:
-  default:
-    desc: >
-      この Taskfile に定義されたすべてのタスクを、名前と説明つきで一覧表示する。
-      初めて使うときや、利用可能な操作を確認するときの入口タスク。
-    silent: true
+  # --- 初期セットアップ ---
+  init:
+    desc: 帝国の初期環境構築（.env作成とフォルダ準備）
     cmds:
-      - task --list-all
+      - cp -n .env.example .env || true
+      - cp -n mcp/gateway.env.example mcp/gateway.env || true
+      - mkdir -p prompts skills storage/postgres mcp/vault
+      - echo "帝国が開国されました。各.envファイルにAPIキーを入力してください。"
 
-  init-env:
-    desc: >
-      プロジェクト直下に .env が存在しない場合だけ、.env.example をコピーして .env を新規作成する。
-      あわせて mcp/gateway.env が無ければ mcp/gateway.env.example からコピーする（MCP Gateway の bind mount 用。未作成のままだと docker compose up が失敗する）。
-      既存ファイルは上書きしない。OS に応じて Unix 系と Windows（cmd）のどちらかの手順が動く。
-      作成後は POSTGRES_PASSWORD や各種シークレット、および MCP ツール用の gateway.env を必ず編集し、本番相当の値に差し替えること。
-    cmds:
-      - task: init-env-unix
-        platforms: [linux, darwin, freebsd]
-      - task: init-env-windows
-        platforms: [windows]
-
-  init-env-unix:
-    internal: true
-    cmds:
-      - |
-        if [ ! -f .env ]; then
-          cp .env.example .env
-          echo ".env を .env.example から作成しました"
-        else
-          echo ".env は既に存在します"
-        fi
-        if [ ! -f mcp/gateway.env ]; then
-          cp mcp/gateway.env.example mcp/gateway.env
-          echo "mcp/gateway.env を mcp/gateway.env.example から作成しました"
-        else
-          echo "mcp/gateway.env は既に存在します"
-        fi
-
-  init-env-windows:
-    internal: true
-    cmds:
-      - cmd: if not exist .env copy /Y .env.example .env
-      - cmd: if not exist mcp\gateway.env copy /Y mcp\gateway.env.example mcp\gateway.env
-
-  postgres-init-perm:
-    desc: >
-      PostgreSQL コンテナ初回起動時に docker-entrypoint-initdb.d から実行される
-      postgres-init/01-init-databases.sh に実行権限（chmod +x）を付与する。
-      公式 postgres イメージは「実行可能な .sh」のみをサブシェルで実行するため、Linux / macOS / BSD で初回 DB 作成が走る前に必要になることがある。
-      プラットフォームが Windows のときは Task の対象外となり、このタスクを直接実行してもエラーになる（WSL2 や Git Bash 上の Task が Unix として動く場合は実行可能）。
-    platforms: [linux, darwin, freebsd]
-    cmds:
-      - chmod +x postgres-init/01-init-databases.sh
-
-  setup:
-    desc: >
-      初めてスタックを起動する前に一度まとめて実行することを想定した準備タスク。
-      init-env で .env と mcp/gateway.env（MCP Gateway 用）を用意し、Unix 系 OS では続けて postgres-init-perm を実行して DB 初期化スクリプトを実行可能にする。
-      Windows では実質 init-env のみが有効になる。
-    cmds:
-      - task: init-env
-      - task: postgres-init-perm
-
-  config:
-    desc: >
-      `docker compose config --quiet` で docker-compose.yml と .env の変数展開・参照整合性を検証する。
-      構文ミスや未定義の環境変数を、`up` する前に早期に発見できる。Docker デーモンが起動している必要がある。
-    cmds:
-      - "{{.COMPOSE}} config --quiet"
-
+  # --- 起動・停止 ---
   up:
-    desc: >
-      `docker compose up -d` で compose に定義された全サービスをデタッチド（バックグラウンド）で起動する。
-      事前に .env の用意と Docker Desktop または Docker Engine の起動が必要。初回はイメージ取得に時間がかかることがある。
+    desc: 円卓の64人を召喚（コンテナ起動）
     cmds:
-      - "{{.COMPOSE}} up -d"
+      - "{{.DOCKER_COMPOSE}} up -d --build"
+      - task: status
 
   down:
-    desc: >
-      `docker compose down` でコンテナと compose が作ったネットワークを停止・削除する。
-      名前付きボリューム（PostgreSQL データ、Ollama モデル格納、WebUI データなど）は削除されず残る。
+    desc: 帝国を一時閉国
     cmds:
-      - "{{.COMPOSE}} down"
+      - "{{.DOCKER_COMPOSE}} down"
 
-  down-volumes:
-    desc: >
-      `docker compose down -v` でコンテナに加え、compose で宣言した名前付きボリュームも削除する。
-      PostgreSQL の全データ、Ollama のモデルキャッシュ、Open WebUI の永続データなどが消える完全リセット向き。
-      実行前にプロンプトで確認が出る。
-    prompt: 名前付きボリュームを削除します。よろしいですか？
+  status:
+    desc: 帝国の稼働状況確認
     cmds:
-      - "{{.COMPOSE}} down -v"
+      - "{{.DOCKER_COMPOSE}} ps"
 
-  ps:
-    desc: >
-      `docker compose ps` で各サービスの稼働状態、公開ポート、コンテナ名を一覧表示する。
-      起動直後のヘルスチェック通過状況や、どの URL にアクセスすればよいかを確認するときに使う。
-    cmds:
-      - "{{.COMPOSE}} ps"
-
+  # --- 開発・デバッグ ---
   logs:
-    desc: >
-      `docker compose logs -f` で全サービスの標準出力・エラーをフォアグラウンドでリアルタイム追尾する。
-      障害調査や起動シーケンスの確認に向く。Ctrl+C はログ表示の終了のみで、コンテナ自体は停止しない。
+    desc: 64名の思考ログをリアルタイム監視
     cmds:
-      - "{{.COMPOSE}} logs -f"
+      - "{{.DOCKER_COMPOSE}} logs -f zeroclaw"
 
-  pull:
-    desc: >
-      `docker compose pull` で compose ファイルに書かれたイメージをレジストリから取得し直す。
-      `latest` や `main` など可変タグを使っている場合の更新・セキュリティパッチ取り込み用。
+  # --- 多言語環境のメンテナンス ---
+  polyglot-refresh:
+    desc: JS/PHP/Go/Rust の実行サンドボックスを再構築
     cmds:
-      - "{{.COMPOSE}} pull"
+      - docker build -t imperial-polyglot-runner ./skills/runtimes
+      - echo "多言語ランタイムが更新されました。"
 
-  restart:
-    desc: >
-      `docker compose restart` で現在動いている全コンテナを再起動する。
-      環境変数や compose の変更を反映したい場合は `down` のあと `up`、または `up -d --force-recreate` の方が適切なことが多い。
+  # --- MCPサーバー（神器）の管理 ---
+  mcp-sync:
+    desc: 39のスキル（MCPサーバー）を最新化
     cmds:
-      - "{{.COMPOSE}} restart"
+      - docker restart mcp-gateway
+      - echo "39の神器が再同期されました。"
 
-  ollama-pull:
-    desc: >
-      すでに `up` 済みの `ollama` サービス内で `ollama pull` を実行し、推論用の GGUF モデルをダウンロードする。
-      既定モデルは Taskfile の DEFAULT_MODEL（litellm_config の既定と揃えた llama3.1）。
-      別名を引きたいときは `task ollama-pull -- MODEL=mistral` のように変数 MODEL を渡す。Ollama コンテナが起動している必要がある。
+  # --- 知識基盤 (Context7) の更新 ---
+  knowledge-update:
+    desc: 過去の資産や設計書を Context7 へ再インデックス
     cmds:
-      - "{{.COMPOSE}} exec ollama ollama pull {{.MODEL | default .DEFAULT_MODEL}}"
+      - "{{.DOCKER_COMPOSE}} exec zeroclaw python scripts/sync_knowledge.py"
+
+  # --- 帝国始動：CTOへの号令 ---
+  start:
+    desc: CTO（技術総帥）にプロジェクト開始を命じる
+    summary: |
+      使用法: task start MSG="[プロジェクト概要]"
+      例: task start MSG="RustとNext.jsで暗号通貨ウォレットアプリを作れ。法務チェックも忘れるな。"
+    cmds:
+      - |
+        curl -X POST http://localhost:42617/api/orchestrate \
+          -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+          -H "Content-Type: application/json" \
+          -d '{"instruction": "{{.MSG}}"}'
+    preconditions:
+      - sh: "[ -n '{{.MSG}}' ]"
+        msg: "指令（MSG）を入力してください。"
+
+  # --- 監査・クリーンアップ ---
+  audit:
+    desc: セキュリティ監査部による全ログのスキャン
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec zeroclaw python scripts/security_audit.py"
+
+  clean:
+    desc: 一時ファイルとキャッシュの破棄
+    cmds:
+      - rm -rf storage/postgres/*
+      - docker system prune -f

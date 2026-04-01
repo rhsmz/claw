@@ -1,81 +1,97 @@
-# MCP Gateway まわりの設定
+# ZeroClaw Enterprise: MCP Layer - The Imperial Arsenal
 
-このディレクトリは **Docker MCP Gateway**（`docker-compose.yml` の `mcp-gateway` サービス）向けの、リポジトリ内で管理しやすい設定の置き場です。
+このディレクトリは、**「円卓の64人（The Sovereign 64）」**が現実世界を操作し、知性を実行力へと変換するための **MCP (Model Context Protocol)** サーバー群を管理します。
 
-変数の詳細（`CONTEXT7_API_KEY` / `GITHUB_TOKEN` 等）は **[ENV.md](../ENV.md) の「2. mcp/gateway.env」** を参照してください。
+39のスキル（神器）が、どのサーバーによって提供され、どのエージェントに紐付けられているかを定義します。
 
-## 公式の考え方（3 層）
+---
 
-Docker MCP Gateway は主に次の要素の組み合わせで動きます。
+## 1. 接続アーキテクチャ
 
-1. **有効にする MCP サーバ**  
-   既定では Docker が配布する [MCP カタログ](http://desktop.docker.com/mcp/catalog/v2/catalog.yaml) からサーバ定義を取得し、`--servers` で名前を指定して有効化します。  
-   複数指定する場合は **カンマ区切り**（例: `duckduckgo,fetch`）で、ルートの `.env` にある `MCP_GATEWAY_SERVERS` から渡しています。
+エージェント（LLM）は `mcp-gateway` を通じて以下のサーバー群にアクセスします。
+各サーバーは、特定のプログラミング言語ランタイム、クラウドAPI、またはローカルファイルシステムへの特権アクセスを持ちます。
 
-2. **ツール用シークレット**  
-   GitHub や検索 API など、サーバが要求する API キーは **`gateway.env`**（このディレクトリ）に `KEY=value` 形式で記載します。  
-   Compose では `/gateway.env` としてマウントし、`--secrets=/gateway.env` で Gateway に読み込ませています。  
-   Docker Desktop のシークレットストアを併用したい場合は、[公式ドキュメントの `--secrets`](https://github.com/docker/mcp-gateway/blob/main/docs/mcp-gateway.md) の「コロン区切り」の書式を参照し、`docker-compose.yml` の `command` を調整してください。
+---
 
-3. **（上級者向け）config / カタログ / プロファイル**  
-   - `--config` … Gateway 用の `config.yaml` をマウントして上書きする。  
-   - `--catalog` … カスタムカタログ YAML のパス。  
-   - `--profile` … Docker の「プロファイル」機能が有効なとき、`docker mcp profile` で作った集合を指定。  
-   詳細は [mcp-gateway.md](https://github.com/docker/mcp-gateway/blob/main/docs/mcp-gateway.md) と [profiles.md](https://github.com/docker/mcp-gateway/blob/main/docs/profiles.md) を参照してください。
+## 2. スキル・マッピング・マトリクス (39 Skills)
 
-## 初回にやること
+| カテゴリ | スキル名 | 対応MCPサーバー | 主な利用者 |
+| :--- | :--- | :--- | :--- |
+| **知能・基盤** | `knowledge_base` | `context7` | 全指揮官, 監査部 |
+| | `logical_reasoning` | `sequential-thinking` | 全エージェント |
+| | `time_management` | `time` | PM, PMO, RM |
+| **調査・諜報** | `market_research` | `brave-search` | PdM, Scout, Strategist |
+| | `academic_research` | `arxiv` | CTO, Scout, Wizards |
+| | `web_search` | `duckduckgo` | Support, Scout |
+| | `knowledge_base_lookup` | `wikipedia` | Support, Scout |
+| **開発基盤** | `filesystem` | `filesystem` | Lead, Dev, Writer |
+| | `github_api` | `github` | 全エンジニア, PM |
+| | `code_interpreter` | `python-shell` | Test Devs, SRE |
+| | `api_testing` | `curl-executor` | Backend, Integration |
+| | `api_spec_manager` | `openapi-spec-tool` | Design Pod, Consistency |
+| **多言語実行** | `runtime_js` | `node-runtime` | Client Pod |
+| | `linter_js` | `eslint-analyzer` | Client Reviewer |
+| | `runtime_php` | `php-runtime` | Backend (PHP) |
+| | `linter_php` | `phpstan-analyzer` | PHP Hardener |
+| | `runtime_go` | `go-runtime` | Backend (Go), Infra |
+| | `linter_go` | `golangci-analyzer` | Go Sentinel |
+| | `runtime_rust` | `rust-runtime` | Backend (Rust) |
+| | `linter_rust` | `clippy-analyzer` | Rust Governor |
+| **データ・構造** | `db_operation` | `postgres` | Architect, Backend |
+| | `cache_design` | `redis` | Middleware Tuner |
+| | `diagram_generation` | `mermaid-renderer` | Architect, Writer |
+| **法務・規約** | `legal_research` | `legal-db-api` | General Counsel |
+| | `ip_search` | `trademark-search` | IP Specialist |
+| | `doc_parsing` | `pdf-parser` | Legal Pod, GRC |
+| | `platform_guideline_scraper` | `web-scraper` | Policy Liaison |
+| **品質・監視** | `error_monitoring` | `sentry` | SRE, Resilience Test |
+| | `ui_inspection` | `browserbase` | UX Researcher, HI Auditor |
+| | `vuln_scan` | `snyk` | Security Auditor |
+| | `secret_vault` | `hashicorp-vault` | Security Design |
+| **インフラ** | `cloud_compute` | `aws` | Infra Pod, SRE |
+| | `container_builder` | `docker-mcp` | Infra Lead, DevOps |
+| | `container_orchestration` | `kubernetes` | SRE, Chaos Tester |
+| **連携・共有** | `team_notify_discord` | `discord` | PM, Release Manager |
+| | `team_notify_slack` | `slack` | PMO, PM |
+| | `wiki_management` | `notion` | Scout, Writer |
+| | `enterprise_docs` | `confluence` | Writer, CS |
 
-1. **`gateway.env` を用意する**（未作成なら）  
-   ```bash
-   cp mcp/gateway.env.example mcp/gateway.env
-   ```  
-   Windows（cmd）: `copy mcp\gateway.env.example mcp\gateway.env`  
-   または `task init-env` / `task setup` 実行時に同様のコピーが走るようにしてある場合はそれに従う。
+---
 
-2. **`.env` でサーバ一覧を調整する**  
-   `MCP_GATEWAY_SERVERS` に、カタログに存在するサーバ名をカンマ区切りで書きます。`.env.example` では `duckduckgo,context7` を例示しています。未設定時は Compose 側の既定で **`duckduckgo` のみ** です。名前はカタログの定義と完全一致させてください。
+## 3. セットアップガイド
 
-3. **`gateway.env` にキーを足す**  
-   有効にしたサーバの README / カタログ定義に書かれた環境変数名と一致させます。
+### 3.1 サーバーの起動
+`mcp-gateway` は Docker Compose 経由で起動します。
+```bash
+docker-compose up -d mcp-gateway
+```
 
-## なぜ `docker.sock` をマウントするのか
+### 3.2 認証情報の同期
+`gateway.env` に必要な API キーがすべて設定されていることを確認してください。
+特に `CONTEXT7_API_KEY` と `GITHUB_PERSONAL_ACCESS_TOKEN` がないと、帝国の知能と実行力の 80% が失われます。
 
-Gateway はツール呼び出しのたびに **別コンテナとして MCP サーバを起動**します。そのため **ホストの Docker デーモンに API で触る必要**があり、`/var/run/docker.sock` のマウントが公式 Compose 例でも必須です。  
-**ホスト上の Docker をほぼフル権限で使える**のと同格のリスクがあるため、信頼できるネットワーク・マシンでのみ使う運用を推奨します。
+---
 
-## クライアントからの接続（SSE）
+## 4. 多言語ランタイムの運用 (Polyglot Runtimes)
 
-Gateway は `--transport=sse` と `--port=8811` で待ち受けています。エディタやエージェント側の「MCP の URL 指定」が必要な場合は、次を起点に公式手順を確認してください。
+帝国は JS, PHP, Go, Rust を等しく愛します。各ランタイムは隔離されたサンドボックス環境（Docker）で実行されます。
 
-- [Docker Docs: MCP Gateway](https://docs.docker.com/ai/mcp-gateway/)
-- [GitHub: docker/mcp-gateway](https://github.com/docker/mcp-gateway)
+- **JS/TS**: `node-runtime` を使用。`package.json` の解析から `npx` による実行まで対応。
+- **PHP**: `php-runtime` を使用。`composer` 連携による依存解決と `phpstan` による静的解析を強制。
+- **Go**: `go-runtime` を使用。並行処理のデッドロック検知を含むテスト実行をサポート。
+- **Rust**: `rust-runtime` を使用。`cargo` ツールチェーンを用い、メモリ安全性をコンパイルレベルで検証。
 
-接続 URL のパス（例: `/sse` など）はクライアント・Gateway のバージョンで異なることがあるため、起動ログとクライアント側ドキュメントを照合してください。
+---
 
-## ZeroClaw などスタック内のエージェントから使う場合
+## 5. セキュリティ・ポリシー
 
-コンテナからはホストの `localhost` ではなく **サービス名**で参照します。例:
+1.  **Vault Integration**: 本番環境の認証情報は `secret_vault` (HashiCorp Vault) を経由します。エージェントがプロンプト上に生パスワードを出力することは禁止されています。
+2.  **Safety Sandbox**: すべての `code_interpreter` および `runtime` はネットワーク制限されたコンテナ内で実行されます。
+3.  **Audit Logs**: すべての MCP ツール呼び出しは `storage/postgres` に監査ログとして記録され、`security_auditor` によって常時監視されます。
 
-- 同一 Compose ネットワーク上の別コンテナから: `http://mcp-gateway:8811`（パスはクライアント仕様に合わせる）
+---
 
-ZeroClaw 側の `config.toml` や環境変数で MCP のベース URL を指定できる場合は、そこに上記を設定します（バージョンごとにキー名が異なるため、利用中の ZeroClaw の設定リファレンスを確認してください）。
+## 6. 技術調査部 (INTEL Pod) による更新
 
-## Context7（ドキュメント MCP）
-
-[Context7](https://context7.com/docs/overview) は **LLM ではなく**、ライブラリの最新ドキュメント断片を返す **MCP サーバ／HTTP API** です。Ollama 本体に「プラグインとして取り込む」仕組みはなく、**エージェントやエディタが MCP ツールとして呼ぶ**形でスタックと組み合わせます。
-
-1. **Docker MCP カタログ**  
-   サーバ名 `context7`（イメージ例: `mcp/context7`）を有効にします。本リポジトリの `.env.example` では `MCP_GATEWAY_SERVERS=duckduckgo,context7` としています。
-
-2. **認証**  
-   無料利用ではキーなしでも動く場合があります。上限を上げるには [API キー](https://context7.com/howto/api-keys) を発行し、**`mcp/gateway.env`** に次を追記します（Gateway が各 MCP コンテナへ注入します）。  
-   `CONTEXT7_API_KEY=ctx7sk_...`
-
-3. **REST API を直接叩く場合**  
-   エージェントのカスタムツールから [Context7 HTTP API](https://context7.com/docs/api-guide)（`Authorization: Bearer ...`）を呼ぶこともできます。その場合は MCP Gateway とは別経路のため、キー管理とレート制限をアプリ側で行ってください。
-
-推論は引き続き **Ollama（または LiteLLM 経由のクラウドモデル）**、根拠付けの資料取得に **Context7**、という役割分担になります。
-
-## ローカルサーバ定義（`file://`）
-
-カタログではなく自作・社内用のサーバ YAML を使う場合は、[Server Entry Specification](https://github.com/docker/mcp-gateway/blob/main/docs/server-entry-spec.md) に沿ったファイルをこのディレクトリに置き、ホストで `docker mcp profile create` と `--profile` を使う方法が一般的です。Compose 内コンテナだけで完結させる場合は、該当ファイルをボリュームマウントし、`command` に `--catalog` や `--servers` を追加する形で調整してください。
+`tech_trend_scout` および `security_intel_analyst` は、週に一度この MCP レイヤーのツール自体をアップデートする責任を負います。
+新しい MCP サーバーがコミュニティで公開された場合、彼らはまず `legal_risk_simulator` の承認を得た上で、この `README.md` に追記します。

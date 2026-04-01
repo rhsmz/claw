@@ -1,0 +1,47 @@
+{
+    "mcpServers": {
+      "search": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "env": { "BRAVE_SEARCH_API_KEY": "" }
+      },
+      "github": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "" }
+      },
+      "postgres": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:pass@postgres:5432/db"]
+      },
+      "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/workspace"]
+      },
+      "sequential-thinking": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+      },
+      "node-runtime": {
+        "command": "docker",
+        "args": ["run", "-i", "--rm", "node:20-alpine", "node"]
+      },
+      "polyglot-sandbox": {
+        "command": "docker",
+        "args": ["run", "-i", "--rm", "imperial-polyglot-runner:latest"]
+      },
+      "sentry": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sentry"]
+      },
+      "context7": {
+        "command": "npx",
+        "args": ["-y", "@context7/mcp-server"],
+        "env": { "CONTEXT7_API_KEY": "" }
+      },
+      "mermaid": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-mermaid"]
+      }
+    }
+  }
