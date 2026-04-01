@@ -1,86 +1,139 @@
 version: '3'
 
+# =============================================================================
+# 帝国全軍指揮用変数 (Global Variables)
+# =============================================================================
 vars:
   PROJECT_NAME: zeroclaw-enterprise
   DOCKER_COMPOSE: docker-compose -p {{.PROJECT_NAME}}
+  # config.toml に基づく既定ポート
+  API_PORT: 42617 
+  # バニラ状態の標準モデル
+  VANILLA_MODEL: "gemma3:12b"
+  # Rust管理ツールのパス
+  MGMT_PATH: "./scripts/management"
 
+# =============================================================================
+# 帝国管理タスク (Imperial Tasks)
+# =============================================================================
 tasks:
-  # --- 初期セットアップ ---
-  init:
-    desc: 帝国の初期環境構築（.env作成とフォルダ準備）
+  default:
+    desc: タスク一覧を表示
+    cmds:
+      - task --list-all
+
+  # ---------------------------------------------------------------------------
+  # 1. 建国・初期化 (Setup & Initialization)
+  # ---------------------------------------------------------------------------
+  setup:
+    desc: 帝国の建国準備（環境変数・ディレクトリ・権限設定）
+    summary: |
+      初期セットアップを全自動で行います。
+      1. .env ファイルの生成
+      2. 必要な作業ディレクトリの作成
+      3. DB初期化スクリプトへの実行権限付与
     cmds:
       - cp -n .env.example .env || true
       - cp -n mcp/gateway.env.example mcp/gateway.env || true
       - mkdir -p prompts skills storage/postgres mcp/vault
-      - echo "帝国が開国されました。各.envファイルにAPIキーを入力してください。"
+      - chmod +x postgres-init/01-init-databases.sh
+      - echo "建国準備完了。各 .env にAPIキーを入力後、'task up' を実行してください。"
 
-  # --- 起動・停止 ---
+  # ---------------------------------------------------------------------------
+  # 2. 進軍・戦線展開 (Infrastructure Control)
+  # ---------------------------------------------------------------------------
   up:
-    desc: 円卓の64人を召喚（コンテナ起動）
+    desc: 帝国全軍を召喚し、戦線を展開（Docker起動）
     cmds:
       - "{{.DOCKER_COMPOSE}} up -d --build"
       - task: status
 
   down:
-    desc: 帝国を一時閉国
+    desc: 戦線を縮小し、全軍を帰還させる（コンテナ停止）
     cmds:
       - "{{.DOCKER_COMPOSE}} down"
 
   status:
-    desc: 帝国の稼働状況確認
+    desc: 帝国の各司令部（コンテナ）の稼働状況を確認
     cmds:
       - "{{.DOCKER_COMPOSE}} ps"
 
-  # --- 開発・デバッグ ---
   logs:
-    desc: 64名の思考ログをリアルタイム監視
+    desc: 64名のエージェントの思考ログを監視
     cmds:
       - "{{.DOCKER_COMPOSE}} logs -f zeroclaw"
 
-  # --- 多言語環境のメンテナンス ---
-  polyglot-refresh:
-    desc: JS/PHP/Go/Rust の実行サンドボックスを再構築
+  # ---------------------------------------------------------------------------
+  # 3. 兵装整備 (Model & Runtime Logistics)
+  # ---------------------------------------------------------------------------
+  ollama-pull:
+    desc: バニラ推論モデル (gemma3:12b) を取得
+    cmds:
+      - docker compose exec ollama ollama pull {{.VANILLA_MODEL}}
+
+  polyglot-build:
+    desc: 多言語実行サンドボックス (JS/PHP/Go/Rust) を再構築
     cmds:
       - docker build -t imperial-polyglot-runner ./skills/runtimes
-      - echo "多言語ランタイムが更新されました。"
+      - echo "多言語ランタイムの同期が完了しました。"
 
-  # --- MCPサーバー（神器）の管理 ---
   mcp-sync:
-    desc: 39のスキル（MCPサーバー）を最新化
+    desc: 39の神器（MCPサーバー）を再同期
     cmds:
       - docker restart mcp-gateway
-      - echo "39の神器が再同期されました。"
+      - echo "全ツールが再接続されました。"
 
-  # --- 知識基盤 (Context7) の更新 ---
-  knowledge-update:
-    desc: 過去の資産や設計書を Context7 へ再インデックス
-    cmds:
-      - "{{.DOCKER_COMPOSE}} exec zeroclaw python scripts/sync_knowledge.py"
-
-  # --- 帝国始動：CTOへの号令 ---
-  start:
-    desc: CTO（技術総帥）にプロジェクト開始を命じる
+  # ---------------------------------------------------------------------------
+  # 4. 皇帝の号令 (Orchestration & Commands)
+  # ---------------------------------------------------------------------------
+  command:
+    desc: CTO（技術総帥）へプロジェクトの制圧を命じる
     summary: |
-      使用法: task start MSG="[プロジェクト概要]"
-      例: task start MSG="RustとNext.jsで暗号通貨ウォレットアプリを作れ。法務チェックも忘れるな。"
+      皇帝（ユーザー）からCTOへ直接指令を送ります。
+      使用法: task command MSG="[具体的な指令]"
+    vars:
+      LITELLM_KEY:
+        sh: grep LITELLM_MASTER_KEY .env | cut -d '=' -f2
     cmds:
       - |
-        curl -X POST http://localhost:42617/api/orchestrate \
-          -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+        curl -X POST http://localhost:{{.API_PORT}}/api/orchestrate \
+          -H "Authorization: Bearer {{.LITELLM_KEY}}" \
           -H "Content-Type: application/json" \
           -d '{"instruction": "{{.MSG}}"}'
     preconditions:
       - sh: "[ -n '{{.MSG}}' ]"
-        msg: "指令（MSG）を入力してください。"
+        msg: "指令（MSG）を入力してください。例: task command MSG='Rustで高速Webサーバーを構築せよ'"
 
-  # --- 監査・クリーンアップ ---
-  audit:
-    desc: セキュリティ監査部による全ログのスキャン
+  # ---------------------------------------------------------------------------
+  # 5. 帝国統治 (Rust Management & Audit)
+  # ---------------------------------------------------------------------------
+  sync:
+    desc: [Rust] 過去の資産やWikiを知識基盤 (Context7) へ同期
     cmds:
-      - "{{.DOCKER_COMPOSE}} exec zeroclaw python scripts/security_audit.py"
+      - cargo run --manifest-path {{.MGMT_PATH}}/Cargo.toml -- sync
 
+  audit:
+    desc: [Rust] 全クルーの監査ログをスキャンし、セキュリティ事案を検知
+    cmds:
+      - cargo run --manifest-path {{.MGMT_PATH}}/Cargo.toml -- audit
+
+  check:
+    desc: [Rust] 帝国のインフラ（Ollama/LiteLLM/DB）の生存確認
+    cmds:
+      - cargo run --manifest-path {{.MGMT_PATH}}/Cargo.toml -- status
+
+  # ---------------------------------------------------------------------------
+  # 6. 浄化 (Maintenance & Cleanup)
+  # ---------------------------------------------------------------------------
   clean:
     desc: 一時ファイルとキャッシュの破棄
     cmds:
       - rm -rf storage/postgres/*
       - docker system prune -f
+      - echo "帝国の全領域を浄化しました。"
+
+  purge:
+    desc: データベースを含む全データを完全抹消（注意：復旧不可）
+    prompt: 本当に全てのデータを削除しますか？
+    cmds:
+      - "{{.DOCKER_COMPOSE}} down -v"

@@ -1,44 +1,105 @@
+# =============================================================================
+# LiteLLM Configuration - The Sovereign 64 (Imperial Communication Hub)
+# =============================================================================
+
 model_list:
-  # --- 指揮官・アーキテクト用 (最高知能) ---
-  - model_name: grand-logic-model
+  # ---------------------------------------------------------------------------
+  # 1. バニラ設定: ローカル推論エンジン (Ollama)
+  # ---------------------------------------------------------------------------
+  # 帝国の標準OS。コストゼロで24時間稼働する基幹モデル。
+  
+  - model_name: imperial-logic-high-v1  # 指揮官・アーキテクト・法務用
     litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
-      rpm: 500
+      model: ollama/gemma3:12b
+      api_base: http://ollama:11434
       timeout: 300
+      tpm: 100000
+      rpm: 1000
 
-  # --- 開発部隊・ウィザード用 (コーディング特化) ---
-  - model_name: code-master-model
+  - model_name: imperial-build-knight-v1 # 開発部隊・ウィザード用
     litellm_params:
-      model: anthropic/claude-3-5-sonnet-20240620
-      api_key: os.environ/ANTHROPIC_API_KEY
-      rpm: 200
+      model: ollama/gemma3:12b
+      api_base: http://ollama:11434
+      timeout: 600
 
-  # --- 調査・スカウト・サポート用 (高速・低コスト) ---
-  - model_name: fast-scout-model
+  - model_name: imperial-scout-mini-v1  # 調査・諜報・サポート・文書生成用
     litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
-      rpm: 5000
+      model: ollama/gemma3:12b
+      api_base: http://ollama:11434
+      timeout: 120
 
-  # --- セキュリティ・法務監査用 (長文コンテキスト) ---
-  - model_name: heavy-audit-model
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
-      max_tokens: 16384
+  # ---------------------------------------------------------------------------
+  # 2. 追加設定: クラウドLLM (必要に応じてコメントアウトを解除して有効化)
+  # ---------------------------------------------------------------------------
+  # 極めて複雑な論理推論や、大規模なコード生成が必要な場合に切り替えます。
 
-# ロードバランシングとフォールバックの設定
+  # --- OpenAI Stack ---
+  # - model_name: imperial-logic-high-v1
+  #   litellm_params:
+  #     model: openai/gpt-4o
+  #     api_key: os.environ/OPENAI_API_KEY
+  #     rpm: 500
+
+  # - model_name: imperial-scout-mini-v1
+  #   litellm_params:
+  #     model: openai/gpt-4o-mini
+  #     api_key: os.environ/OPENAI_API_KEY
+
+  # --- Anthropic Stack ---
+  # - model_name: imperial-build-knight-v1
+  #   litellm_params:
+  #     model: anthropic/claude-3-5-sonnet-20240620
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+  #     rpm: 200
+
+# =============================================================================
+# ルーティング & フォールバック設定
+# =============================================================================
+
 router_settings:
-  routing_strategy: usage-based-routing-v2 # 負荷の低いモデルを優先
+  # 負荷ベースのルーティング。複数のOllamaインスタンスがある場合に有効。
+  routing_strategy: usage-based-routing-v2 
+  
+  # ローカルモデルがタイムアウトしたりエラーを吐いた際の救済策。
   enable_fallbacks: true
+  context_window_fallbacks:
+    - [.*, openai/gpt-4o] # コンテキスト溢れ時はクラウドへ逃がす設定例
+  
+  # エラー発生時の自動リトライ設定
+  num_retries: 3
+  retry_after: 5
   set_verbose: false
+
+# =============================================================================
+# グローバル設定
+# =============================================================================
 
 general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY # config.tomlの認証に使用
-  database_url: os.environ/POSTGRES_URL # 使用量統計を記録
+  # config.toml の [llm] セクションからの認証に使用。
+  master_key: os.environ/LITELLM_MASTER_KEY 
+  
+  # 実行統計・トークン消費量を記録。
+  database_url: os.environ/POSTGRES_URL 
+  store_model_usage: true
 
 litellm_settings:
-  drop_params: true # サポート外のパラメータを自動削除
-  set_verbose: false
-  telemetry: false
+  # 推論結果をキャッシュして応答を高速化し、トークンを節約。
+  cache: true
+  cache_type: redis
+  
+  # 未知のパラメータが送られてきてもエラーにせず無視する。
+  drop_params: true
+  
+  # 可観測性ツール（Langfuse）との連携設定
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+
+# =============================================================================
+# 監査・セキュリティ設定
+# =============================================================================
+# セキュリティ監査部（The INTEL Pod）がログを収集しやすくするための設定。
+
+# ユーザーID（クルー名）をメタデータとして付与し、誰がどのモデルを叩いたか追跡。
+metadata:
+  project: "zeroclaw-enterprise"
+  tier: "sovereign-64"
