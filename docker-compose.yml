@@ -1,0 +1,193 @@
+# ローカル生成AIスタック: Ollama / LiteLLM / Langfuse / Open WebUI / ZeroClaw / MCP Gateway / PostgreSQL(pgvector)
+# GPU なし環境では ollama サービスの deploy ブロックを削除してください。
+
+networks:
+  agent_mesh:
+    driver: bridge
+
+volumes:
+  pg_data:
+  ollama_data:
+  webui_data:
+  zeroclaw_workspace:
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: ai_postgres_vector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ZEROCLAW_DB_NAME: ${ZEROCLAW_DB_NAME}
+      WEBUI_DB_NAME: ${WEBUI_DB_NAME}
+      LANGFUSE_DB_NAME: ${LANGFUSE_DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - agent_mesh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai_ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - agent_mesh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: ai_litellm_proxy
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: http://langfuse:3000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+    networks:
+      - agent_mesh
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: ai_langfuse_ops
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${LANGFUSE_DB_NAME}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      SALT: ${LANGFUSE_SALT}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - agent_mesh
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  zeroclaw:
+    image: ghcr.io/zeroclaw-labs/zeroclaw:latest
+    container_name: ai_zeroclaw_agent
+    restart: unless-stopped
+    environment:
+      ZEROCLAW_PROVIDER: openai
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+      OPENAI_BASE_URL: http://litellm:4000/v1
+      ZEROCLAW_MODEL: ${DEFAULT_MODEL}
+      ZEROCLAW_ALLOW_PUBLIC_BIND: "true"
+      ZEROCLAW_GATEWAY_PORT: ${ZEROCLAW_GATEWAY_PORT}
+      ZEROCLAW_STORAGE_PROVIDER: postgres
+      ZEROCLAW_STORAGE_DB_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
+    volumes:
+      - zeroclaw_workspace:/zeroclaw-data
+    ports:
+      - "${ZEROCLAW_GATEWAY_PORT}:${ZEROCLAW_GATEWAY_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+    networks:
+      - agent_mesh
+
+  mcp-gateway:
+    image: docker/mcp-gateway:latest
+    container_name: ai_mcp_gateway
+    restart: unless-stopped
+    environment:
+      DOCKER_MCP_IN_CONTAINER: "1"
+      USE_API_SOCKET: "true"
+    ports:
+      - "8811:8811"
+    # 子 MCP サーバ用コンテナを起動するためホストの Docker に接続する（高権限。本番では範囲を検討）。
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./mcp/gateway.env:/gateway.env:ro
+    # 設定の詳細は mcp/README.md。--secrets は Engine 単体利用時のキー供給用。
+    command:
+      - --transport=sse
+      - --port=8811
+      - --servers=${MCP_GATEWAY_SERVERS:-duckduckgo}
+      - --secrets=/gateway.env
+    networks:
+      - agent_mesh
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ai_open_webui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      OLLAMA_BASE_URL: http://litellm:4000
+      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${WEBUI_DB_NAME}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+    volumes:
+      - webui_data:/app/backend/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+    networks:
+      - agent_mesh
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
