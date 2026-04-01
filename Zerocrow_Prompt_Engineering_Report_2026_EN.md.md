@@ -1,9 +1,3 @@
-ご確認ありがとうございます！それでは、ご提示いただいたレポートの英訳版マークダウンを再出力いたします。
-
-2026年現在の最新技術（ZerocrowやCrewAI）に基づいた、専門的かつ実践的な内容に仕上げております。
-
----
-
 # Prompt Engineering in Next-Generation Agent Orchestration: Building and Optimizing Autonomous Workflows Focused on Zerocrow and CrewAI
 
 ## Introduction: The Shift to Agentic Orchestration
