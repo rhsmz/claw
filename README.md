@@ -149,13 +149,19 @@ ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
 | タスク | 概要 |
 |--------|------|
 | `task` | タスク一覧表示 |
-| `task setup` | 初回準備（`.env` / `gateway.env` の雛形・必要ディレクトリ作成） |
-| `task up` / `down` / `ps` / `logs` | Compose の基本操作 |
-| `task up-with-ui` | Open WebUI（8080）・Langfuse（3000）を起動（`--profile ui`） |
-| `task config` | `docker compose config` による検証 |
-| `task pull` | イメージの更新取得 |
+| `task setup` | 初回準備（`.env` / `gateway.env`・`wiki/notion` 等のディレクトリ） |
+| `task up` / `task down` | コアスタックの起動・停止 |
+| `task ps` / `task status` | `docker compose ps` |
+| `task logs` / `task logs-mcp` / `task logs-ui` / `task logs-zeroclaw` | サービス別ログ追跡 |
+| `task up-with-ui` | Open WebUI（8080）・Langfuse（3000）（`--profile ui`） |
+| `task up-with-zeroclaw` | ZeroClaw を追加（`--profile zeroclaw`） |
+| `task up-full` | コア + UI + ZeroClaw を一括（`--profile ui --profile zeroclaw`） |
+| `task config` / `task compose-validate` | `docker compose config --quiet` |
+| `task pull` | `docker compose pull`（イメージ更新取得） |
 | `task down-volumes` | ボリュームごと削除（**データ全消去**・確認プロンプトあり） |
-| `task ollama-pull` | Ollama 内で `pull` |
+| `task ollama-pull` | Ollama でモデル取得（上書き: `task ollama-pull -- MODEL=...`） |
+| `task hexa-ollama-pull` / `task rag-ingest` | ローカル RAG（hexa-rag）用モデル取得・ingest |
+| `task mcp-sync` | `mcp-gateway` 再起動 |
 
 ## 設定ファイル
 

@@ -1,6 +1,7 @@
 version: '3'
 
 # ルートの .env を Task から参照（存在しない場合は無視されない環境もあるため、先に task setup を推奨）
+# Compose プロファイル: ui（Open WebUI / Langfuse）, zeroclaw — up-full で両方まとめて起動
 dotenv: ['.env']
 
 # =============================================================================
@@ -10,11 +11,11 @@ vars:
   PROJECT_NAME: zeroclaw-enterprise
   # Compose V2: docker-compose.yml の top-level `name:` がプロジェクト名になる
   DOCKER_COMPOSE: docker compose
-  # config.toml に基づく既定ポート
-  API_PORT: 42617 
-  # バニラ状態の標準モデル
+  # ZeroClaw / task command の API ポート（.env の ZEROCLAW_PORT と揃える）
+  API_PORT: 42617
+  # Ollama pull の既定（.env の DEFAULT_MODEL と揃えたい場合は task ollama-pull -- MODEL=...）
   VANILLA_MODEL: "gemma4:e2b"
-  # Rust管理ツールのパス
+  # Rust 管理 CLI
   MGMT_PATH: "./scripts/management"
 
 # =============================================================================
@@ -47,7 +48,7 @@ tasks:
     cmds:
       - cp -n .env.example .env || true
       - cp -n mcp/gateway.env.example mcp/gateway.env || true
-      - mkdir -p prompts skills storage/postgres mcp/vault
+      - mkdir -p prompts skills storage/postgres mcp/vault wiki/notion wiki/confluence
       - echo "建国準備完了。各 .env にAPIキーを入力後、'task up' を実行してください。"
 
   setup-windows:
@@ -71,15 +72,37 @@ tasks:
       - task: status
 
   up-with-ui:
-    desc: Open WebUI（:8080）と Langfuse（:3000）を起動（--profile ui）
+    desc: Open WebUI（:8080）と Langfuse（:3000）を起動（--profile ui。初回は .env に LANGFUSE_* 等が必要）
     cmds:
       - "{{.DOCKER_COMPOSE}} --profile ui up -d"
+      - task: status
+
+  up-full:
+    desc: コア + Web UI + ZeroClaw を一括起動（--profile ui --profile zeroclaw）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} --profile ui --profile zeroclaw up -d"
       - task: status
 
   compose-validate:
     desc: docker compose 定義の検証（環境変数展開と YAML）
     cmds:
       - "{{.DOCKER_COMPOSE}} config --quiet"
+
+  # README / 習慣用エイリアス
+  config:
+    desc: compose-validate と同じ（docker compose config --quiet）
+    cmds:
+      - task: compose-validate
+
+  ps:
+    desc: status と同じ（docker compose ps）
+    cmds:
+      - task: status
+
+  pull:
+    desc: Compose サービスのイメージを更新取得（docker compose pull）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} pull"
 
   down:
     desc: 戦線を縮小し、全軍を帰還させる（コンテナ停止）
@@ -92,9 +115,19 @@ tasks:
       - "{{.DOCKER_COMPOSE}} ps"
 
   logs:
-    desc: コアサービス（litellm / ollama / postgres）のログを追跡
+    desc: コアサービス（litellm / ollama / postgres / mcp-gateway）のログを追跡
     cmds:
-      - "{{.DOCKER_COMPOSE}} logs -f litellm ollama postgres"
+      - "{{.DOCKER_COMPOSE}} logs -f litellm ollama postgres mcp-gateway"
+
+  logs-mcp:
+    desc: MCP Gateway のログ
+    cmds:
+      - "{{.DOCKER_COMPOSE}} logs -f mcp-gateway"
+
+  logs-ui:
+    desc: Open WebUI / Langfuse 系（--profile ui 起動時）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} logs -f open-webui langfuse-web langfuse-worker"
 
   logs-zeroclaw:
     desc: ZeroClaw コンテナのログ（--profile zeroclaw で起動した場合）
@@ -105,18 +138,21 @@ tasks:
   # 3. 兵装整備 (Model & Runtime Logistics)
   # ---------------------------------------------------------------------------
   ollama-pull:
-    desc: バニラ推論モデル (gemma4:e2b) を取得
+    desc: "Ollama でモデルを pull（既定 VANILLA_MODEL。上書き例: task ollama-pull -- MODEL=gemma3:12b）"
     cmds:
-      - "{{.DOCKER_COMPOSE}} exec ollama ollama pull {{.VANILLA_MODEL}}"
+      - '{{.DOCKER_COMPOSE}} exec ollama ollama pull {{if .MODEL}}{{.MODEL}}{{else}}{{.VANILLA_MODEL}}{{end}}'
 
   hexa-ollama-pull:
-    desc: hexa-rag-mcp 用の埋め込み/LLM モデルを取得
+    desc: hexa-rag-mcp 用の埋め込み・LLM モデル（hexa-vector.config.json の bge / qwen 想定）
     cmds:
       - "{{.DOCKER_COMPOSE}} exec ollama ollama pull bge-m3"
       - "{{.DOCKER_COMPOSE}} exec ollama ollama pull qwen2.5:7b"
 
   rag-ingest:
-    desc: hexa-rag-mcp のベクトルDBを wiki/ から取り込み
+    desc: ローカル RAG（hexa-rag）— wiki/notion・wiki/confluence の MD を ingest（mcp-gateway 起動必須）
+    summary: |
+      hexa-vector.config.json の sources を Postgres（DATABASE_URL）へ取り込みます。
+      MCP の hexa_rag は compose の --servers 次第でゲートウェイに載らない場合があります（mcp/README.md 参照）。
     cmds:
       - "{{.DOCKER_COMPOSE}} exec -T mcp-gateway npx -y @hyphaene/hexa-rag-mcp --config /app/workspace/hexa-vector.config.json ingest --incremental"
 
@@ -127,10 +163,10 @@ tasks:
       - echo "多言語ランタイムの同期が完了しました。"
 
   mcp-sync:
-    desc: 39の神器（MCPサーバー）を再同期
+    desc: MCP Gateway コンテナを再起動（設定・カタログの再読込）
     cmds:
       - "{{.DOCKER_COMPOSE}} restart mcp-gateway"
-      - echo "全ツールが再接続されました。"
+      - echo "mcp-gateway を再起動しました。"
 
   # ---------------------------------------------------------------------------
   # 4. 皇帝の号令 (Orchestration & Commands)
