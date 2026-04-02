@@ -365,3 +365,12 @@ If unable to complete due to missing critical context:
 - [ ] 細粒度タスクのSKILLユニット化が完了し、共通リポジトリで再利用可能になっている
 - [ ] SKILLユニットがセクション別フォルダで管理され、各セクション資産として再利用可能になっている
 - [ ] 各クループロンプトが必要SKILLを能動的に読み出し可能で、適用ログが残っている
+
+## Progress Update (2026-04-02 UTC)
+- Reworked prompt architecture to layered references: base + common contracts + section profiles + skill cards + per-crew prompts.
+- Re-authored crew prompts with role-aware execution discipline and explicit skill activation guidance.
+- Continued work in top-down order focused on prompt generation and governance alignment.
+
+- Aligned crew prompt content with TASKS.MD template requirements (Identity/Mission Context/Reasoning/Tool Policy/Guardrails/Strict JSON).
+
+- Created Schema Set, Validation Report, and `/ja` Japanese deliverable placeholders.
