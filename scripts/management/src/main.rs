@@ -86,9 +86,15 @@ async fn run_security_audit(pool: &sqlx::PgPool) -> Result<()> {
     .fetch_all(pool)
     .await?;
 
-    for row in rows {
-        let crew_name: String = row.try_get("crew_name").unwrap_or_default();
-        let details: String = row.try_get("details").unwrap_or_default();
+    for (i, row) in rows.iter().enumerate() {
+        let crew_name: Option<String> = row
+            .try_get::<Option<String>, _>("crew_name")
+            .with_context(|| format!("audit_logs 行 {} の crew_name をデコードできませんでした", i))?;
+        let details: Option<String> = row
+            .try_get::<Option<String>, _>("details")
+            .with_context(|| format!("audit_logs 行 {} の details をデコードできませんでした", i))?;
+        let crew_name = crew_name.unwrap_or_default();
+        let details = details.unwrap_or_default();
         // キーワードベースの簡易検知（実際にはLLMによる高度な判定が可能）
         if details.contains("API_KEY") || details.contains("password") {
             warn!("⚠️ セキュリティ警告: クルー [{}] が機密情報を出力した可能性があります", crew_name);
