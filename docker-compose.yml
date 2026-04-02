@@ -68,6 +68,8 @@ services:
         condition: service_healthy
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
+      # Prisma baseline / diff 用（同一 DB に postgres-init があると P3005 → baseline 処理が走る）
+      - litellm_migrations:/var/lib/litellm-migrations
     ports:
       - "4000:4000"
     environment:
@@ -76,6 +78,7 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
       REDIS_URL: redis://redis:6379/0
+      LITELLM_MIGRATION_DIR: /var/lib/litellm-migrations
     command:
       - "--config"
       - "/app/config.yaml"
@@ -171,3 +174,4 @@ volumes:
   postgres_data:
   ollama_data:
   zeroclaw_data:
+  litellm_migrations:
