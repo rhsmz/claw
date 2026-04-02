@@ -113,4 +113,4 @@ Windows（cmd）の例: `copy .env.example .env`
 - **秘密情報の取り扱い**: `.env` と `mcp/gateway.env` はコミットしないでください（`.gitignore` 済み）。
 - **変数名の食い違い**: ルート `.env`（`GITHUB_PAT`）と MCP 用ファイル（`GITHUB_PERSONAL_ACCESS_TOKEN`）で名前が異なる場合があります。どちらに書いたかと、Compose が実際に渡している名前を一致させてください。
 - **MCP サーバがツールとして見えない**: `zeroclaw/config.toml` の `mcp_server` と、ゲートウェイが認識する **`mcp/config.json` のキー**が一致している必要があります。Brave 検索のように **キー名が `search` と `brave-search` で異なる**場合は、どちらかに揃えるか、ゲートウェイの設定方法に合わせてください。
-- **Langfuse / PostgreSQL など**: Langfuse 自己ホスト用の `DATABASE_URL` / `NEXTAUTH_SECRET` 等は README のトラブルシューティングおよび `docker-compose.yml` の各サービス定義を参照してください。
+- **Langfuse / Open WebUI**: `docker compose --profile ui` 用の変数は `.env.example` の「12. Web UI」節を参照してください（`OPEN_WEBUI_SECRET_KEY`、`LANGFUSE_ENCRYPTION_KEY` は起動前に変更推奨）。Langfuse の `DATABASE_URL` は compose 内で `langfuse_db` に向けて補間されます。

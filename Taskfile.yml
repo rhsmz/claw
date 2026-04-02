@@ -13,7 +13,7 @@ vars:
   # config.toml に基づく既定ポート
   API_PORT: 42617 
   # バニラ状態の標準モデル
-  VANILLA_MODEL: "gemma3:12b"
+  VANILLA_MODEL: "gemma4:e2b"
   # Rust管理ツールのパス
   MGMT_PATH: "./scripts/management"
 
@@ -70,6 +70,12 @@ tasks:
       - "{{.DOCKER_COMPOSE}} --profile zeroclaw up -d"
       - task: status
 
+  up-with-ui:
+    desc: Open WebUI（:8080）と Langfuse（:3000）を起動（--profile ui）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} --profile ui up -d"
+      - task: status
+
   compose-validate:
     desc: docker compose 定義の検証（環境変数展開と YAML）
     cmds:
@@ -99,7 +105,7 @@ tasks:
   # 3. 兵装整備 (Model & Runtime Logistics)
   # ---------------------------------------------------------------------------
   ollama-pull:
-    desc: バニラ推論モデル (gemma3:12b) を取得
+    desc: バニラ推論モデル (gemma4:e2b) を取得
     cmds:
       - "{{.DOCKER_COMPOSE}} exec ollama ollama pull {{.VANILLA_MODEL}}"
 
