@@ -15,12 +15,9 @@ audit_log = true # 全操作の監査ログを記録
 backend = "sqlite"
 auto_save = true
 
-[storage.provider.config]
-provider = "postgres"
-db_url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}"
-schema = "public"
-table = "memories"
-connect_timeout_secs = 15
+# ghcr.io/zeroclaw-labs/zeroclaw の既定ビルドは [memory].backend の postgres を解釈せず警告になる。
+# かつ [storage.provider.config] の provider がメモリ側に取り込まれて "postgres" 扱いになる事例があるため、
+# 公式イメージでは sqlite のみ使用する。Postgres 永続化が必要なカスタムビルドでは公式ドキュメントに従って復元する。
 
 [llm]
 provider = "openai"
