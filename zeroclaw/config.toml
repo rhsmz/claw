@@ -22,8 +22,19 @@ max_retries = 3
 
 [mcp]
 enabled = true
+# 公式スキーマ: リモート MCP は [[mcp.servers]]。deferred_loading=false でゲートウェイ配下のツールを起動時に登録。
+deferred_loading = false
+
+[[mcp.servers]]
+name = "docker-mcp-gateway"
+transport = "http"
 url = "http://mcp-gateway:8811/sse"
-tool_timeout_sec = 300
+command = ""
+args = []
+
+[mcp.servers.env]
+
+[mcp.servers.headers]
 
 # =============================================================================
 # 1. 経営・プロダクト戦略部 (Management & Vision: 9名)
@@ -519,165 +530,10 @@ skills = ["filesystem", "github_api", "wiki_management", "diagram_generation", "
 temperature = 0.1
 
 # =============================================================================
-# Skill Definitions (The Sovereign Arsenal - 39 Skills)
+# [skills]（公式）: open-skills 等のグローバル設定。キー名が旧 [[skills]] と衝突するためテーブル配列は使えない。
+# crew の skills = ["market_research", ...] はエージェント用スキル ID。MCP ツールは docker-mcp-gateway 1 本でまとめて提供。
+# 旧 name → mcp_server 対応表は mcp/README.md のマトリクスを参照。
 # =============================================================================
-
-[[skills]]
-name = "knowledge_base"
-mcp_server = "hexa_rag" # ローカル RAG（Markdown -> pgvector）
-
-[[skills]]
-name = "logical_reasoning"
-mcp_server = "sequential-thinking"
-
-[[skills]]
-name = "time_management"
-mcp_server = "time"
-
-[[skills]]
-name = "market_research"
-mcp_server = "search"
-
-[[skills]]
-name = "academic_research"
-mcp_server = "arxiv"
-
-[[skills]]
-name = "web_search"
-mcp_server = "duckduckgo"
-
-[[skills]]
-name = "knowledge_base_lookup"
-mcp_server = "hexa_rag"
-
-[[skills]]
-name = "filesystem"
-mcp_server = "filesystem"
-
-[[skills]]
-name = "github_api"
-mcp_server = "github"
-
-[[skills]]
-name = "code_interpreter"
-mcp_server = "python-shell"
-
-[[skills]]
-name = "api_testing"
-mcp_server = "curl-executor"
-
-[[skills]]
-name = "api_spec_manager"
-mcp_server = "openapi-spec-tool"
-
-[[skills]]
-name = "runtime_js"
-mcp_server = "node-runtime"
-
-[[skills]]
-name = "linter_js"
-mcp_server = "eslint-analyzer"
-
-[[skills]]
-name = "runtime_backend"
-mcp_server = "polyglot-sandbox"
-
-[[skills]]
-name = "linter_backend"
-mcp_server = "backend-analyzer"
-
-[[skills]]
-name = "runtime_php"
-mcp_server = "php-runtime"
-
-[[skills]]
-name = "linter_php"
-mcp_server = "phpstan-analyzer"
-
-[[skills]]
-name = "runtime_go"
-mcp_server = "go-runtime"
-
-[[skills]]
-name = "linter_go"
-mcp_server = "golangci-analyzer"
-
-[[skills]]
-name = "runtime_rust"
-mcp_server = "rust-runtime"
-
-[[skills]]
-name = "linter_rust"
-mcp_server = "clippy-analyzer"
-
-[[skills]]
-name = "db_operation"
-mcp_server = "postgres"
-
-[[skills]]
-name = "cache_design"
-mcp_server = "redis"
-
-[[skills]]
-name = "diagram_generation"
-mcp_server = "mermaid"
-
-[[skills]]
-name = "doc_parsing"
-mcp_server = "pdf-parser"
-
-[[skills]]
-name = "legal_research"
-mcp_server = "legal-database-api"
-
-[[skills]]
-name = "ip_search"
-mcp_server = "trademark-patent-search"
-
-[[skills]]
-name = "platform_guideline_scraper"
-mcp_server = "web-scraper"
-
-[[skills]]
-name = "error_monitoring"
-mcp_server = "sentry"
-
-[[skills]]
-name = "ui_inspection"
-mcp_server = "browserbase"
-
-[[skills]]
-name = "vuln_scan"
-mcp_server = "snyk"
-
-[[skills]]
-name = "secret_vault"
-mcp_server = "hashicorp-vault-mcp"
-
-[[skills]]
-name = "cloud_compute"
-mcp_server = "aws"
-
-[[skills]]
-name = "container_builder"
-mcp_server = "docker-mcp"
-
-[[skills]]
-name = "container_orchestration"
-mcp_server = "kubernetes"
-
-[[skills]]
-name = "team_notify_discord"
-mcp_server = "discord"
-
-[[skills]]
-name = "team_notify_slack"
-mcp_server = "slack"
-
-[[skills]]
-name = "wiki_management"
-mcp_server = "notion_snapshots"
-
-[[skills]]
-name = "enterprise_docs"
-mcp_server = "confluence_snapshots"
+[skills]
+open_skills_enabled = false
+prompt_injection_mode = "compact"
