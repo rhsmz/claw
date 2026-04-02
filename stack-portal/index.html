@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZeroClaw Enterprise — スタックポータル</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;1,9..40,400&family=Syne:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --card: #151a22;
+      --border: #2a3344;
+      --text: #e8ecf4;
+      --muted: #8b95a8;
+      --accent: #f4a261;
+      --accent2: #2a9d8f;
+      --danger: #e76f51;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      background-image:
+        radial-gradient(ellipse 120% 80% at 10% -20%, rgba(244, 162, 97, 0.12), transparent),
+        radial-gradient(ellipse 80% 60% at 100% 0%, rgba(42, 157, 143, 0.1), transparent);
+    }
+    .wrap {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    header {
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-family: Syne, sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      letter-spacing: -0.02em;
+      margin: 0 0 0.5rem;
+    }
+    .lead {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      max-width: 40rem;
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 560px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    a.card {
+      display: block;
+      padding: 1.25rem 1.35rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    a.card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    a.card:focus-visible {
+      outline: 2px solid var(--accent2);
+      outline-offset: 2px;
+    }
+    .card h2 {
+      font-family: Syne, sans-serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+      color: var(--accent);
+    }
+    .card .port {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 0.5rem;
+    }
+    .card p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .featured {
+      grid-column: 1 / -1;
+      border-color: var(--accent2);
+      background: linear-gradient(135deg, #151a22 0%, #1a222e 100%);
+    }
+    .featured h2 { color: var(--accent2); }
+    footer {
+      margin-top: 2.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    code { font-size: 0.85em; background: #1e2633; padding: 0.1em 0.35em; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>スタックポータル</h1>
+      <p class="lead">
+        ローカル Docker スタックの各 UI へジャンプします。<strong>ZeroClaw</strong> の公式ダッシュボードは
+        <code>:42617</code> で起動します（初回はペアリングが必要な場合があります）。
+      </p>
+    </header>
+
+    <div class="grid">
+      <a class="card featured" href="http://localhost:42617/" target="_blank" rel="noopener">
+        <h2>ZeroClaw ゲートウェイ</h2>
+        <div class="port">http://localhost:42617/</div>
+        <p>Web ダッシュボード・<code>/health</code>・ペアリング（ログに表示されるコード）。エージェントの状態確認はここが本体です。</p>
+      </a>
+
+      <a class="card" href="http://localhost:4000/" target="_blank" rel="noopener">
+        <h2>LiteLLM</h2>
+        <div class="port">:4000</div>
+        <p>OpenAI 互換 API・Swagger UI。モデル一覧とヘルス確認。</p>
+      </a>
+
+      <a class="card" href="http://localhost:8080/" target="_blank" rel="noopener">
+        <h2>Open WebUI</h2>
+        <div class="port">:8080</div>
+        <p>チャット UI（<code>--profile ui</code> 起動時）。</p>
+      </a>
+
+      <a class="card" href="http://localhost:3000/" target="_blank" rel="noopener">
+        <h2>Langfuse</h2>
+        <div class="port">:3000</div>
+        <p>トレース・可観測性（<code>--profile ui</code> 起動時）。</p>
+      </a>
+
+      <a class="card" href="http://localhost:11434/" target="_blank" rel="noopener">
+        <h2>Ollama</h2>
+        <div class="port">:11434</div>
+        <p>API ルート。ブラウザでは JSON が返るだけのことが多いです。</p>
+      </a>
+
+      <div class="card" style="cursor: default;">
+        <h2>MCP Gateway</h2>
+        <div class="port">:8811 /sse</div>
+        <p>SSE は MCP クライアント用。ブラウザで開くと真っ白でも正常なことがあります。</p>
+      </div>
+    </div>
+
+    <footer>
+      このページは Nginx で静的配信されています。ポートは compose の <code>stack-portal</code> 設定（既定 8042）に合わせてください。
+    </footer>
+  </div>
+</body>
+</html>

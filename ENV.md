@@ -50,6 +50,7 @@ Windows（cmd）の例: `copy .env.example .env`
 | | `NOTION_API_KEY` / `NOTION_DATABASE_ID` | Notion（任意: 一度ローカルへ export する場合） |
 | | `CONFLUENCE_API_TOKEN` / `CONFLUENCE_EMAIL` / `CONFLUENCE_URL` | Confluence（任意: 一度ローカルへ export する場合） |
 | 多言語サンドボックス | `COMPOSER_AUTH` / `CARGO_HOME` / `GOPATH` / `NODE_ENV` | ビルド・実行環境 |
+| Stack Portal | `STACK_PORTAL_PORT` | 静的ポータル（`stack-portal/`）のホスト公開ポート（既定 `8042`） |
 
 **GitHub トークン名の対応**: `mcp/config.json` や `mcp/gateway.env.example` では `GITHUB_PERSONAL_ACCESS_TOKEN` という名前が使われます。ルート `.env` では **`GITHUB_PAT`** を設定し、Compose が MCP Gateway コンテナ内では `GITHUB_PERSONAL_ACCESS_TOKEN` として渡します。`mcp/gateway.env` に直接書く場合は **`GITHUB_PERSONAL_ACCESS_TOKEN`** で統一してください。
 

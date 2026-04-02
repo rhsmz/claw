@@ -34,6 +34,8 @@ check_tcp() {
 }
 
 echo "=== stack smoke (127.0.0.1) ==="
+STACK_PORTAL_PORT="${STACK_PORTAL_PORT:-8042}"
+check_http "Stack Portal" "http://127.0.0.1:${STACK_PORTAL_PORT}/"
 check_http "LiteLLM liveness" "http://127.0.0.1:4000/health/liveness"
 check_http "Ollama /api/tags" "http://127.0.0.1:11434/api/tags"
 check_http "ZeroClaw /health" "http://127.0.0.1:42617/health"

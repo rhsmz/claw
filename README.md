@@ -48,12 +48,13 @@ flowchart LR
 | [Langfuse](https://langfuse.com/)（v3 イメージ、`--profile ui`） | トレース・分析 | 3000 |
 | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | Rust 製エージェントランタイム | `.env` の `ZEROCLAW_GATEWAY_PORT`（例: 42617） |
 | [Docker MCP Gateway](https://github.com/docker/mcp-gateway) | MCP サーバのオーケストレーション | 8811 |
+| Stack Portal（`nginx:alpine`・`stack-portal/`） | ZeroClaw / LiteLLM / Open WebUI 等へのジャンプページ | `.env` の `STACK_PORTAL_PORT`（既定 8042） |
 | [Open WebUI](https://openwebui.com/)（`--profile ui`） | チャット UI・RAG 等 | 8080 |
 
 ### Docker Compose（本リポジトリの現状）
 
 - **Compose ファイル**は V2 形式です（トップレベル `version` は未使用）。プロジェクト名は **`name: zeroclaw-enterprise`** で固定しています。CLI は **`docker compose`**（ハイフン無し）を想定しています（`task` からも同様）。
-- **既定の `docker compose up -d`**（または `task up`）では **PostgreSQL・Redis・Ollama・LiteLLM・MCP Gateway** を起動します。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、LiteLLM は Postgres / Redis / Ollama が **healthy** になるまで待ってから起動します。`litellm_config.yaml` はルートをマウントし、`.env` の `DEFAULT_MODEL`（例: `gemma4:e2b`）向けに `model_list` へエイリアスを用意しています。
+- **既定の `docker compose up -d`**（または `task up`）では **PostgreSQL・Redis・Ollama・LiteLLM・MCP Gateway・Stack Portal（静的リンク集、既定 :8042）** を起動します。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、LiteLLM は Postgres / Redis / Ollama が **healthy** になるまで待ってから起動します。`litellm_config.yaml` はルートをマウントし、`.env` の `DEFAULT_MODEL`（例: `gemma4:e2b`）向けに `model_list` へエイリアスを用意しています。
 - **Open WebUI（:8080）と Langfuse（:3000）** は **プロファイル `ui`** で起動します（ClickHouse / MinIO / Langfuse 専用 Redis を同梱）。初回はイメージ取得と DB マイグレーションで **数分**かかることがあります。例: `docker compose --profile ui up -d` または **`task up-with-ui`**。`.env` の `OPEN_WEBUI_SECRET_KEY` と `LANGFUSE_*`（`LANGFUSE_ENCRYPTION_KEY` は `openssl rand -hex 32` 推奨）を起動前に変更してください。
 - **ZeroClaw** は **`ghcr.io/zeroclaw-labs/zeroclaw:latest`** を **プロファイル `zeroclaw`** で任意起動します。公式デプロイに合わせ **`zeroclaw_data` ボリューム**（`/zeroclaw-data`）にワークスペースを保持し、**`zeroclaw/config.toml` を `.../.zeroclaw/config.toml` に read-only マウント**します。`[[crews]]` を含む本リポジトリの設定は OSS 版と完全には一致しない可能性があるため、起動しない場合は `zeroclaw doctor` / ログで照合してください。起動例: `docker compose --profile zeroclaw up -d` または `task up-with-zeroclaw`。
 - 初回は Ollama 側でモデルを取得してください（例: `task ollama-pull`）。
@@ -129,12 +130,13 @@ docker compose exec ollama ollama pull llama3.1
 
 | 用途 | URL | 備考 |
 |------|-----|------|
+| Stack Portal（リンク集） | http://localhost:8042 | **`task up`** で起動。ZeroClaw 公式ダッシュボード等へジャンプ（ポートは `STACK_PORTAL_PORT` で変更可） |
 | Open WebUI | http://localhost:8080 | **`task up-with-ui`**（`--profile ui`）後に表示 |
 | Langfuse | http://localhost:3000 | 同上。MinIO コンソールは http://localhost:9091（127.0.0.1 のみ公開） |
 | LiteLLM（OpenAI 互換ベース） | http://localhost:4000 | コアスタックの `task up` で起動 |
 | Ollama API | http://localhost:11434 | `curl http://localhost:11434/api/tags` など |
 
-ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
+ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後に `.env` の `ZEROCLAW_GATEWAY_PORT`（例: http://localhost:42617）で開きます。ポータルから同 URL へリンクしています。
 
 ### 6\. 初回のみ（UI）
 

@@ -1,5 +1,5 @@
 # Compose V2 形式（version キーは不要）。
-# 既定: Postgres / Redis / Ollama / LiteLLM / MCP Gateway
+# 既定: Postgres / Redis / Ollama / LiteLLM / MCP Gateway / Stack Portal（各 UI へのリンク・既定 :8042）
 # Web UI（Open WebUI :8080 / Langfuse :3000）: docker compose --profile ui up -d
 # ZeroClaw: docker compose --profile zeroclaw up -d
 # 参考: https://docs.docker.com/compose/ / ZeroClaw deployment（公式イメージ・設定マウント）
@@ -100,6 +100,16 @@ services:
       timeout: 10s
       retries: 8
       start_period: 600s
+
+  # 静的ポータル（ZeroClaw / LiteLLM / Open WebUI 等へのジャンプページ）
+  stack-portal:
+    image: nginx:alpine
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${STACK_PORTAL_PORT:-8042}:80"
+    volumes:
+      - ./stack-portal:/usr/share/nginx/html:ro
 
   # ---------------------------------------------------------------------------
   # Web UI（プロファイル ui）— postgres-init で openwebui_db / langfuse_db を作成済み
