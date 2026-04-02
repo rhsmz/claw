@@ -84,12 +84,13 @@ services:
       - "/app/config.yaml"
       - "--port"
       - "4000"
+    # 初回・DB 共有時は P3005→baseline→多数マイグレーションで数分かかり、この間 /health は応答しない
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:4000/health >/dev/null || exit 1"]
       interval: 15s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 8
+      start_period: 600s
 
   mcp-gateway:
     # 公式イメージ（Docker Hub Verified）。`mcp/gateway` は存在せず pull が拒否される
