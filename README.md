@@ -205,6 +205,8 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
   - **Task が `.env` を読めない** `task` は dotenv 形式で `.env` を読み込みます。`.env` に `COMPOSER_AUTH='...'${GITHUB_PAT}'...'` のような **シェル変数展開**が入っているとパースに失敗します。`.env.example` の `COMPOSER_AUTH` の書き方に合わせ、JSON 内にトークンを直接書くか、当該行をコメントアウトしてください。
 
+  - **MCP Gateway の pull が拒否される** イメージは **`docker/mcp-gateway`**（例: `v2` タグ）です。`mcp/gateway` は Docker Hub に無く `pull access denied` になります。`docker-compose.yml` の `mcp-gateway.image` を確認してください。
+
   - **MCP Gateway** 既定の Compose では `mcp/gateway.env` の有無は起動成否に直結しません（`env_file` 未使用）。`task setup` で作成しておくと変数チェックに便利です。`docker.sock` をマウントするためホスト Docker 相当の権限になります。設定の詳細は [mcp/README.md](mcp/README.md) と [Docker MCP Gateway](https://github.com/docker/mcp-gateway) を参照してください。
 
   - **MCP のサーバ名が合わない** `zeroclaw/config.toml` の各スキルの `mcp_server` と、`mcp/config.json` のキー名が一致している必要があります（例: 調査系は `search`）。起動失敗やツールが出ない場合は [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) または `docker mcp` CLI で実名を確認し、`config.json` を修正してください。

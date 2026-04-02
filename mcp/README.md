@@ -95,6 +95,7 @@
 
 ## 4. 起動とファイル配置
 
+- **コンテナイメージ**: Compose では **`docker/mcp-gateway:v2`**（[Docker Hub](https://hub.docker.com/r/docker/mcp-gateway)）を使用します。`mcp/gateway` のような名前は pull できません。
 - **ゲートウェイ**: `docker compose up -d` でコアスタックに含まれます（サービス名 `mcp-gateway`、ポート **8811**）。
 - **マウント**: `./mcp/config.json` をコンテナに読み取り専用で渡します。`/var/run/docker.sock` を渡すため、ホストの Docker と同等の権限になります。
 - **シークレット**: [ENV.md](../ENV.md) に従いルート `.env` を整備してください。`mcp/gateway.env` はテンプレート兼チェックリストです（**既定の Compose では `env_file` として読み込んでいない**点に注意）。

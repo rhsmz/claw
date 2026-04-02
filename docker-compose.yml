@@ -87,7 +87,8 @@ services:
       start_period: 60s
 
   mcp-gateway:
-    image: mcp/gateway:latest
+    # 公式イメージ（Docker Hub Verified）。`mcp/gateway` は存在せず pull が拒否される
+    image: docker/mcp-gateway:v2
     restart: unless-stopped
     depends_on:
       postgres:
