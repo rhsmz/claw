@@ -67,8 +67,7 @@ router_settings:
   # 負荷ベースのルーティング。複数のOllamaインスタンスがある場合に有効。
   routing_strategy: usage-based-routing-v2
 
-  # ローカル only で起動する場合は false（OPENAI_API_KEY 未設定時のフォールバック失敗を防ぐ）
-  enable_fallbacks: false
+  # フォールバックは fallbacks リストで定義（未定義ならモデル間フォールバックなし）。enable_fallbacks は現行 Router で未サポート。
 
   # エラー発生時の自動リトライ設定
   num_retries: 3
