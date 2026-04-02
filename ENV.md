@@ -31,6 +31,7 @@ Windows（cmd）の例: `copy .env.example .env`
 | LLM | `LITELLM_MASTER_KEY` | LiteLLM のマスターキー（ZeroClaw の `API_KEY` 等と揃える） |
 | | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` / `MISTRAL_API_KEY` | クラウドプロバイダ利用時 |
 | | `DEFAULT_MODEL` / `FALLBACK_MODEL` | 既定・フォールバックモデル（`litellm_config.yaml` と整合） |
+| | `OLLAMA_IMAGE` | Ollama サービスの Docker イメージ（既定 `ollama/ollama:0.19.0`。412 時は `pull` で更新） |
 | DB / キャッシュ | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST` / `POSTGRES_PORT` | DB 接続（Compose 内ホスト名は `postgres`、コンテナ内ポートは常に `5432`） |
 | | `POSTGRES_HOST_PORT` | **ホストへ公開する** Postgres ポート（既定 `5432`。ホストで 5432 が使用中なら `5433` など） |
 | | `REDIS_URL` | Redis 接続 URL |

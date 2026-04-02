@@ -228,6 +228,8 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
   - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 11434 / ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。**PostgreSQL** は `.env` の **`POSTGRES_HOST_PORT`**（既定 `5432`）でホスト側ポートを変えられます（例: `5433`。コンテナ同士の接続は引き続き `postgres:5432`）。その他は競合プロセスを止めるか、`docker-compose.yml` の `ports` を変更します。
 
+  - **Ollama で `pull model manifest: 412`（newer version / pre-release）** コンテナ内の Ollama が古いか、`ollama/ollama:latest` がローカルで stale です。`docker compose pull ollama` のあと `docker compose up -d ollama`（または `docker compose up -d --force-recreate ollama`）でイメージを更新してください。Compose は既定で **`OLLAMA_IMAGE`**（例: `ollama/ollama:0.19.0`）を使います。`.env` に追記する場合は `.env.example` を参照し、[Ollama Releases](https://github.com/ollama/ollama/releases) でタグを確認してください。
+
   - **推論が 404 / model not found** `DEFAULT_MODEL`・`litellm_config.yaml` の `model_name`・Ollama 内の `ollama list` の三者が一致しているか確認してください。
 
   - **推論が 401 / OpenAI `invalid_api_key`（ローカルモデル名なのに）** LiteLLM は **`model_list` に無いモデル名**を OpenAI API 向けに送ります（`OPENAI_API_KEY` が検証される）。Ollama で使いたい名前は **`litellm_config.yaml` に `model_name` と `litellm_params.model: ollama/<Ollama名>`、`api_base: http://ollama:11434` を追加**し、LiteLLM を再起動してください。`docker compose exec ollama ollama list` でイメージの有無も確認します。
