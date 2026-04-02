@@ -83,6 +83,17 @@ tasks:
       - "{{.DOCKER_COMPOSE}} --profile ui --profile zeroclaw up -d"
       - task: status
 
+  test:
+    desc: リポジトリ検証（compose config + imperial-management の cargo test）
+    cmds:
+      - task: compose-validate
+      - cargo test --manifest-path {{.MGMT_PATH}}/Cargo.toml
+
+  test-smoke:
+    desc: スタック HTTP スモーク（Docker 起動済み前提。WSL/macOS/Linux で bash 利用可）
+    cmds:
+      - bash scripts/stack-smoke-test.sh
+
   compose-validate:
     desc: docker compose 定義の検証（環境変数展開と YAML）
     cmds:

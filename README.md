@@ -162,6 +162,8 @@ ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
 | `task ollama-pull` | Ollama でモデル取得（上書き: `task ollama-pull -- MODEL=...`） |
 | `task hexa-ollama-pull` / `task rag-ingest` | ローカル RAG（hexa-rag）用モデル取得・ingest |
 | `task mcp-sync` | `mcp-gateway` 再起動 |
+| `task test` | `docker compose config` + `cargo test`（`scripts/management`） |
+| `task test-smoke` | 公開ポートの HTTP/TCP スモーク（**スタック起動後**・WSL/macOS/Linux で `bash` 利用可） |
 
 ## 設定ファイル
 

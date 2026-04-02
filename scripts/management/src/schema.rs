@@ -36,3 +36,12 @@ pub async fn ensure_schema(pool: &PgPool) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn schema_definitions_not_empty() {
+        assert!(!super::STMTS.is_empty());
+        assert!(super::STMTS.iter().all(|s| !s.is_empty()));
+    }
+}
