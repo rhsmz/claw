@@ -1,4 +1,4 @@
-# adbx-claw
+# claw
 
 ローカル環境向けの生成 AI スタックを **Docker Compose** でまとめたリポジトリです。Ollama による推論、LiteLLM による API 正規化とルーティング、Open WebUI によるチャット UI、ZeroClaw による軽量エージェントランタイム、Langfuse による可観測性、PostgreSQL（pgvector）による永続化とベクトル検索、Docker MCP Gateway によるツール接続の土台を、同一ネットワーク上で連携させます。
 
