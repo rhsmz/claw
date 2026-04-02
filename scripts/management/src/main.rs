@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use sqlx::postgres::PgPoolOptions;
+use sqlx::Row;
 use std::env;
 use anyhow::{Context, Result};
 use tracing::{info, warn, error};
@@ -8,7 +9,7 @@ use tracing::{info, warn, error};
 #[command(name = "ImperialManager")]
 #[command(about = "AI帝国：円卓の64人 統合管理システム", long_about = None)]
 struct Cli {
-    @subcommand
+    #[command(subcommand)]
     command: Commands,
 }
 
@@ -79,16 +80,24 @@ async fn run_security_audit(pool: &sqlx::PgPool) -> Result<()> {
     info!("--- 帝国セキュリティ監査プロセス開始 ---");
 
     // 1. 直近の監査ログ（audit_log = true）から疑わしい出力を抽出
-    let rows = sqlx::query!(
-        "SELECT crew_name, action, details FROM audit_logs WHERE created_at > now() - interval '1 hour'"
+    let rows = sqlx::query(
+        "SELECT crew_name, action, details FROM audit_logs WHERE created_at > now() - interval '1 hour'",
     )
     .fetch_all(pool)
     .await?;
 
-    for row in rows {
+    for (i, row) in rows.iter().enumerate() {
+        let crew_name: Option<String> = row
+            .try_get::<Option<String>, _>("crew_name")
+            .with_context(|| format!("audit_logs 行 {} の crew_name をデコードできませんでした", i))?;
+        let details: Option<String> = row
+            .try_get::<Option<String>, _>("details")
+            .with_context(|| format!("audit_logs 行 {} の details をデコードできませんでした", i))?;
+        let crew_name = crew_name.unwrap_or_default();
+        let details = details.unwrap_or_default();
         // キーワードベースの簡易検知（実際にはLLMによる高度な判定が可能）
-        if row.details.contains("API_KEY") || row.details.contains("password") {
-            warn!("⚠️ セキュリティ警告: クルー [{}] が機密情報を出力した可能性があります", row.crew_name);
+        if details.contains("API_KEY") || details.contains("password") {
+            warn!("⚠️ セキュリティ警告: クルー [{}] が機密情報を出力した可能性があります", crew_name);
             // ここで Discord/Slack への通知を飛ばす
         }
     }
