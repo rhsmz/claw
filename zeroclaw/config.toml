@@ -2,18 +2,17 @@
 # ZeroClaw Enterprise Configuration - The Sovereign 64
 # =============================================================================
 #
-# latest イメージは [llm] / [server] / [[crews]] を無視する。プロバイダ・ベース URL はルートキーまたは環境変数を使う。
+# latest イメージは [llm] / [server] / [[crews]] を無視する。プロバイダはルートまたは ZEROCLAW_PROVIDER。ベース URL は OPENAI_API_URL 等（api_url は無視されるビルドあり）。
 default_provider = "openai"
-api_url = "http://litellm:4000/v1"
 
 [server]
 port = 42617
 log_level = "info"
 audit_log = true # 全操作の監査ログを記録
 
-# メモリ永続化: 現行スキーマは [memory].backend + [storage.provider.config]（provider はネストした struct）
+# [memory].backend は sqlite | markdown | qdrant | lucid | none（postgres は未対応 → unknown で markdown フォールバックになる）
 [memory]
-backend = "postgres"
+backend = "sqlite"
 auto_save = true
 
 [storage.provider.config]
@@ -38,8 +37,9 @@ deferred_loading = false
 
 [[mcp.servers]]
 name = "docker-mcp-gateway"
-transport = "http"
-url = "http://mcp-gateway:8811/sse"
+transport = "sse"
+# コンテナ内 DNS で mcp-gateway が解決できない環境があるため、compose の extra_hosts 済み host.docker.internal + 公開ポートへ接続
+url = "http://host.docker.internal:8811/sse"
 command = ""
 args = []
 

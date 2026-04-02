@@ -160,6 +160,9 @@ services:
     image: ghcr.io/zeroclaw-labs/zeroclaw:latest
     restart: unless-stopped
     init: true
+    # MCP をホストの公開ポート経由で取りに行く（同一 compose 内 DNS が効かない WSL/一部環境の回避）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       ZEROCLAW_ALLOW_PUBLIC_BIND: "true"
       ZEROCLAW_GATEWAY_HOST: "0.0.0.0"
@@ -167,6 +170,7 @@ services:
       # 既定プロバイダが openrouter のままだと sk- の API_KEY と整合せず起動失敗する
       ZEROCLAW_PROVIDER: openai
       ZEROCLAW_MODEL: ${DEFAULT_MODEL}
+      OPENAI_BASE_URL: http://litellm:4000/v1
       API_KEY: ${LITELLM_MASTER_KEY}
       OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
