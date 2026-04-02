@@ -90,6 +90,8 @@ task setup
 公式 PostgreSQL イメージは、`docker-entrypoint-initdb.d` に配置された `.sql` を**初回起動時に自動実行**します。
 本リポジトリでは `docker-compose.yml` が `postgres-init/` をマウントするため、実行権限付与や手動実行は不要です（`docker compose up -d` / `task up` で反映）。
 
+**補足**: エントリポイントは init より先に `POSTGRES_DB`（`.env` の `ZEROCLAW_DB_NAME` と一致させる）を作成します。`postgres-init/01-init-databases.sql` はその DB を二重作成せず、`openwebui_db` / `langfuse_db` のみ冪等に作成するため、初回起動でゼロクロー用 DB の重複エラーになりません。
+
 ### 3\. 設定の検証と起動
 
 ```bash
