@@ -145,7 +145,7 @@ ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
 | タスク | 概要 |
 |--------|------|
 | `task` | タスク一覧表示 |
-| `task setup` | 初回準備（`.env` / `gateway.env` の雛形 + Unix では `chmod`） |
+| `task setup` | 初回準備（`.env` / `gateway.env` の雛形・必要ディレクトリ作成） |
 | `task up` / `down` / `ps` / `logs` | Compose の基本操作 |
 | `task config` | `docker compose config` による検証 |
 | `task pull` | イメージの更新取得 |
@@ -186,11 +186,11 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
 | 区分 | 主な MCP サーバ ID（例） | 想定される外部サービス・リソース |
 |------|---------------------------|----------------------------------|
-| **知能・基盤** | `context7`, `sequential-thinking`, `time` | ドキュメント RAG、推論補助、時刻（`time` はサンプル `config.json` 未収載のため要追加） |
-| **調査・諜報** | `brave-search`, `arxiv`, `duckduckgo`, `wikipedia` | Brave、学術検索、一般 Web・百科（キー要否はサービス次第） |
+| **知能・基盤** | `hexa_rag`, `context7`, `sequential-thinking`, `time` | ローカル RAG、ドキュメント補助、推論補助、時刻 |
+| **調査・諜報** | `search`, `arxiv`, `duckduckgo`, `wikipedia` | Brave（キー `search`）、学術検索、一般 Web・百科 |
 | **開発基盤** | `filesystem`, `github`, `python-shell`, `curl-executor`, `openapi-spec-tool` | ローカルファイル、GitHub、実行・HTTP テスト、OpenAPI |
 | **多言語実行** | `node-runtime`, `polyglot-sandbox`, `php-runtime`, `go-runtime`, `rust-runtime` および各 linter | コンテナ／サンドボックス上の JS・PHP・Go・Rust（`docker.sock` 利用に注意） |
-| **データ・構造** | `postgres`, `redis`, `mermaid-renderer` | DB・キャッシュ・図表（`mermaid` キー名との整合は mcp README 参照） |
+| **データ・構造** | `postgres`, `redis`, `mermaid` | DB・キャッシュ・図表（`zeroclaw/config.toml` は `mermaid` に揃えています） |
 | **ドキュメント・法務** | `pdf-parser`, `legal-database-api`, `trademark-patent-search`, `web-scraper` | PDF、法務 DB、商標・特許、ガイドライン取得（契約・実装は別途） |
 | **品質・監視** | `sentry`, `browserbase`, `snyk`, `hashicorp-vault-mcp` | エラー監視、ブラウザ自動化、脆弱性、Vault |
 | **インフラ** | `aws`, `docker-mcp`, `kubernetes` | AWS、Docker、Kubernetes（資格情報は [ENV.md](ENV.md)） |
@@ -203,9 +203,11 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
 ## 注意事項・トラブルシューティング
 
+  - **Task が `.env` を読めない** `task` は dotenv 形式で `.env` を読み込みます。`.env` に `COMPOSER_AUTH='...'${GITHUB_PAT}'...'` のような **シェル変数展開**が入っているとパースに失敗します。`.env.example` の `COMPOSER_AUTH` の書き方に合わせ、JSON 内にトークンを直接書くか、当該行をコメントアウトしてください。
+
   - **MCP Gateway** 既定の Compose では `mcp/gateway.env` の有無は起動成否に直結しません（`env_file` 未使用）。`task setup` で作成しておくと変数チェックに便利です。`docker.sock` をマウントするためホスト Docker 相当の権限になります。設定の詳細は [mcp/README.md](mcp/README.md) と [Docker MCP Gateway](https://github.com/docker/mcp-gateway) を参照してください。
 
-  - **MCP のサーバ名が合わない** `zeroclaw/config.toml` の各スキルの `mcp_server` と、`mcp/config.json` のキー名が一致している必要があります（例: `brave-search` と `search` のずれ）。起動失敗やツールが出ない場合は [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) または `docker mcp` CLI で実名を確認し、`config.json` を修正してください。
+  - **MCP のサーバ名が合わない** `zeroclaw/config.toml` の各スキルの `mcp_server` と、`mcp/config.json` のキー名が一致している必要があります（例: 調査系は `search`）。起動失敗やツールが出ない場合は [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) または `docker mcp` CLI で実名を確認し、`config.json` を修正してください。
 
   - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 11434 / ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。競合プロセスを止めるか、`docker-compose.yml` の `ports` を変更します（変更後は README の URL も読み替え）。
 

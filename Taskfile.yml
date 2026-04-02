@@ -37,10 +37,23 @@ tasks:
       2. 必要な作業ディレクトリの作成
       3. DB初期化スクリプトの配置（docker-compose 起動時に自動実行）
     cmds:
+      - task: setup-unix
+        platforms: [linux, darwin]
+      - task: setup-windows
+        platforms: [windows]
+
+  setup-unix:
+    internal: true
+    cmds:
       - cp -n .env.example .env || true
       - cp -n mcp/gateway.env.example mcp/gateway.env || true
       - mkdir -p prompts skills storage/postgres mcp/vault
       - echo "建国準備完了。各 .env にAPIキーを入力後、'task up' を実行してください。"
+
+  setup-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/task-setup-windows.ps1
 
   # ---------------------------------------------------------------------------
   # 2. 進軍・戦線展開 (Infrastructure Control)
@@ -121,18 +134,11 @@ tasks:
     summary: |
       皇帝（ユーザー）からCTOへ直接指令を送ります。
       使用法: task command MSG="[具体的な指令]"
-    vars:
-      LITELLM_KEY:
-        sh: grep LITELLM_MASTER_KEY .env | cut -d '=' -f2
+    requires:
+      vars: [MSG]
     cmds:
-      - |
-        curl -X POST http://localhost:{{.API_PORT}}/api/orchestrate \
-          -H "Authorization: Bearer {{.LITELLM_KEY}}" \
-          -H "Content-Type: application/json" \
-          -d '{"instruction": "{{.MSG}}"}'
-    preconditions:
-      - sh: "[ -n '{{.MSG}}' ]"
-        msg: "指令（MSG）を入力してください。例: task command MSG='Rustで高速Webサーバーを構築せよ'"
+      # dotenv で .env が読み込まれている前提（Task 3.35+ の env テンプレート）
+      - 'curl -sS -X POST "http://localhost:{{.API_PORT}}/api/orchestrate" -H "Authorization: Bearer {{env "LITELLM_MASTER_KEY"}}" -H "Content-Type: application/json" -d "{\"instruction\": \"{{.MSG}}\"}"'
 
   # ---------------------------------------------------------------------------
   # 5. 帝国統治 (Rust Management & Audit)
@@ -158,12 +164,31 @@ tasks:
   clean:
     desc: 一時ファイルとキャッシュの破棄
     cmds:
+      - task: clean-unix
+        platforms: [linux, darwin]
+      - task: clean-windows
+        platforms: [windows]
+
+  clean-unix:
+    internal: true
+    cmds:
       - rm -rf storage/postgres/*
       - docker system prune -f
       - echo "帝国の全領域を浄化しました。"
 
+  clean-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/task-clean-windows.ps1
+
   purge:
     desc: データベースを含む全データを完全抹消（注意：復旧不可）
+    prompt: 本当に全てのデータを削除しますか？
+    cmds:
+      - "{{.DOCKER_COMPOSE}} down -v"
+
+  down-volumes:
+    desc: ボリュームごと削除（purge と同じ。データ全消去・確認プロンプトあり）
     prompt: 本当に全てのデータを削除しますか？
     cmds:
       - "{{.DOCKER_COMPOSE}} down -v"
