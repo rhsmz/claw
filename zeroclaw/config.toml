@@ -160,7 +160,7 @@ temperature = 0.1
 name = "incident_response_advisor"
 description = "【緊急：指示】事案発生時にWikiをベースに即座に対策ロードマップを提示。"
 prompt_file = "prompts/incident_advisor.md"
-skills = ["team_notify", "logical_reasoning", "knowledge_base", "time_management"]
+skills = ["team_notify_discord", "logical_reasoning", "knowledge_base", "time_management"]
 temperature = 0.0
 
 # =============================================================================
@@ -455,7 +455,7 @@ temperature = 0.0
 name = "release_manager"
 description = "本番デプロイの最終承認権限。デプロイ・ゲートキーパー。"
 prompt_file = "prompts/release_manager.md"
-skills = ["github_api", "team_notify", "error_monitoring", "time_management"]
+skills = ["github_api", "team_notify_discord", "error_monitoring", "time_management"]
 temperature = 0.0
 
 [[crews]]
@@ -501,7 +501,7 @@ temperature = 0.0
 name = "devops_assistant"
 description = "CI/CDパイプライン保守、バックアップ、定期メンテナンス自動化。"
 prompt_file = "prompts/devops_assistant.md"
-skills = ["github_api", "team_notify", "error_monitoring", "cloud_compute", "container_builder"]
+skills = ["github_api", "team_notify_discord", "error_monitoring", "cloud_compute", "container_builder"]
 temperature = 0.1
 
 [[crews]]

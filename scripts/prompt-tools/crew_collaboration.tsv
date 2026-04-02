@@ -1,0 +1,67 @@
+name	upstream	downstream
+product_manager	`project_manager`; executive / human sponsor as assigned; `customer_success_analyst` (feedback)	`planner`; `ux_researcher`; `cto`; `mobile_market_strategist`; `platform_policy_liaison`; `pmo_logic`; `pmo_empathy`; `general_counsel` (legal touchpoints)
+ux_researcher	`product_manager`; `planner`; `project_manager`	`ui_ux_specialist`; `ui_logic_architect`; `human_interface_auditor`; `planner`
+mobile_market_strategist	`product_manager`; `planner`	`platform_policy_liaison`; `client_lead`; `store_submission_gatekeeper`; `ux_researcher`
+platform_policy_liaison	`product_manager`; `general_counsel`; `mobile_market_strategist`	`planner`; `store_submission_gatekeeper`; `client_lead`
+planner	`product_manager`; `project_manager`; `ux_researcher`	`cto`; `system_architect`; `api_interface_designer`; `data_modeling_expert`; `client_lead`; `backend_lead`; `pmo_logic`
+project_manager	Executive / program intake; `{{upstream_inputs}}`	`product_manager`; `cto`; `pmo_logic`; `pmo_empathy`; `integration_lead`; `release_manager`; initiative-specific leads
+cto	`product_manager`; `project_manager`; `pmo_logic`	`system_architect`; `backend_lead`; `client_lead`; `infra_lead`; `security_design_specialist`; `technical_spec_reviewer`
+pmo_logic	`project_manager`; `cto`	All initiative crews (oversight); `integration_lead`; `release_manager`; `planner`
+pmo_empathy	`project_manager`; `pmo_logic`	All pods (coordination, comms); notification skills per policy (`team_notify_discord` / `team_notify_slack`)
+general_counsel	`product_manager`; `project_manager`; `cto`	`ip_trademark_specialist`; `contract_architect`; `privacy_sovereign`; `legal_risk_simulator`; build & release crews for compliance questions
+ip_trademark_specialist	`general_counsel`; `product_manager`	`contract_architect`; `store_submission_gatekeeper`; `technical_writer`
+contract_architect	`general_counsel`; `planner`; `product_manager`	`backend_lead`; `client_lead`; `privacy_sovereign`; `grc_officer`; `store_submission_gatekeeper`
+privacy_sovereign	`general_counsel`; `contract_architect`; `data_modeling_expert`	`backend_lead`; `grc_officer`; `data_modeling_expert`; `security_design_specialist`
+legal_risk_simulator	`general_counsel`; `security_auditor`	`general_counsel`; `product_manager`; `grc_officer`
+tech_trend_scout	`cto`; `system_architect`	`compliance_wiki_editor`; `system_architect`; `technical_writer`
+security_intel_analyst	`security_auditor`; `cto`; `sre_engineer`	`compliance_wiki_editor`; `incident_response_advisor`; `security_design_specialist`
+compliance_wiki_editor	`general_counsel`; `tech_trend_scout`; `security_intel_analyst`	All crews consuming wiki / standards; `technical_writer`
+incident_response_advisor	`security_intel_analyst`; `sre_engineer`; `on-call` directives	`cto`; `infra_lead`; `security_auditor`; `project_manager`; affected leads
+system_architect	`cto`; `product_manager`; `planner`	`api_interface_designer`; `data_modeling_expert`; `ui_logic_architect`; `security_design_specialist`; `backend_lead`; `client_lead`; `infra_lead`
+api_interface_designer	`system_architect`; `planner`; `technical_spec_reviewer`	`backend_lead`; `client_lead`; `contract_test_dev`; `consistency_checker`; `middleware_tuner`
+data_modeling_expert	`system_architect`; `planner`	`backend_lead`; `db_architect`; `api_interface_designer`
+ui_logic_architect	`ux_researcher`; `system_architect`; `planner`	`client_lead`; `ui_ux_specialist`; `human_interface_auditor`
+security_design_specialist	`system_architect`; `security_intel_analyst`	`backend_lead`; `client_lead`; `infra_lead`; `protocol_guardian`
+technical_spec_reviewer	`system_architect`; all design pod outputs	`system_architect`; `cto`; `integration_lead`; design authors (return with findings)
+client_lead	`ui_logic_architect`; `api_interface_designer`; `planner`	`js_ts_wizard`; `ui_ux_specialist`; `integration_lead`
+ui_ux_specialist	`ux_researcher`; `ui_logic_architect`; `client_lead`	`client_lead`; `human_interface_auditor`; `visual_regression_tester`
+js_ts_wizard	`client_lead`; `api_interface_designer`	`js_ts_guardian`; `client_pr_optimizer`; `client_test_dev`
+js_ts_guardian	`client_lead`; `js_ts_wizard`	`client_pr_standardizer`; `client_test_dev`; `security_auditor` (on demand)
+client_pr_optimizer	`client_lead`; `js_ts_wizard`; `js_ts_guardian`	`client_lead`; `integration_lead`; `release_manager`
+client_pr_standardizer	`client_lead`; JS pod implementers	`integration_lead`; `release_manager`
+client_test_dev	`client_lead`; `js_ts_wizard`	`visual_regression_tester`; `integration_lead`; `qa_engineer`
+visual_regression_tester	`client_test_dev`; `ui_ux_specialist`	`integration_lead`; `qa_engineer`
+backend_lead	`api_interface_designer`; `system_architect`; `data_modeling_expert`	`php_artisan`; `php_hardener`; `go_specialist`; `go_sentinel`; `rust_evangelist`; `rust_governor`; `db_architect`; `middleware_tuner`
+db_architect	`data_modeling_expert`; `backend_lead`	`backend_lead`; `php_artisan`; `go_specialist`; `api_unit_tester`
+php_artisan	`backend_lead`	`php_hardener`; `backend_pr_optimizer`; `api_unit_tester`
+php_hardener	`backend_lead`; `php_artisan`	`backend_pr_securitizer`; `api_unit_tester`
+go_specialist	`backend_lead`	`go_sentinel`; `backend_pr_optimizer`; `api_unit_tester`
+go_sentinel	`backend_lead`; `go_specialist`	`backend_pr_securitizer`; `api_unit_tester`
+rust_evangelist	`backend_lead`	`rust_governor`; `backend_pr_optimizer`; `api_unit_tester`
+rust_governor	`backend_lead`; `rust_evangelist`	`backend_pr_securitizer`; `api_unit_tester`
+backend_pr_optimizer	`backend_lead`; language specialists	`backend_lead`; `integration_lead`
+backend_pr_securitizer	`backend_lead`; language specialists	`integration_lead`; `security_auditor`
+api_unit_tester	`backend_lead`; implementers	`resilience_tester`; `integration_lead`; `contract_test_dev`
+resilience_tester	`api_unit_tester`; `backend_lead`	`integration_lead`; `qa_engineer`
+middleware_tuner	`backend_lead`; `sre_engineer`; `system_architect`	`backend_lead`; `sre_engineer`; `infra_lead`
+infra_lead	`cto`; `system_architect`	`sre_engineer`; `infra_pr_optimizer`; `infra_pr_hardener`; `iac_validator`; `devops_assistant`
+sre_engineer	`infra_lead`; `cto`	`backend_lead`; `client_lead`; `middleware_tuner`; `chaos_tester`
+infra_pr_optimizer	`infra_lead`; IaC authors	`infra_lead`; `release_manager`
+infra_pr_hardener	`infra_lead`; IaC authors	`integration_lead`; `security_auditor`
+iac_validator	`infra_lead`	`integration_lead`; `chaos_tester`
+chaos_tester	`infra_lead`; `sre_engineer`	`integration_lead`; `release_manager`
+integration_lead	Pod leads (`client_lead`, `backend_lead`, `infra_lead`, …); `cto`; `project_manager`	`release_manager`; `qa_engineer`; `store_submission_gatekeeper`; `consistency_checker`
+consistency_checker	`integration_lead`; `api_interface_designer`	`integration_lead`; `contract_test_dev`
+contract_test_dev	`integration_lead`; `api_interface_designer`	`integration_lead`; `backend_lead`; `client_lead`
+protocol_guardian	`integration_lead`; `security_design_specialist`	`integration_lead`; `release_manager`
+human_interface_auditor	`ui_ux_specialist`; `ux_researcher`	`store_submission_gatekeeper`; `client_lead`; `product_manager`
+store_submission_gatekeeper	`platform_policy_liaison`; `general_counsel`; `human_interface_auditor`	`release_manager`; `grc_officer`
+release_manager	`integration_lead`; `qa_engineer`; `security_auditor`; `grc_officer`	`devops_assistant`; `project_manager`; `customer_support` (comms)
+qa_engineer	`integration_lead`; `client_test_dev`; `api_unit_tester`; `visual_regression_tester`	`release_manager`; `integration_lead`
+security_auditor	`security_design_specialist`; `backend_pr_securitizer`; `grc_officer`	`release_manager`; `grc_officer`; `security_intel_analyst`
+grc_officer	`general_counsel`; `privacy_sovereign`; `legal_risk_simulator`	`release_manager`; `product_manager`; `ai_observability_lead`
+customer_success_analyst	`customer_support`; `error_monitoring` signals	`product_manager`; `planner`; `pmo_empathy`
+ai_observability_lead	`cto`; `product_manager`; `integration_lead`	`pmo_logic`; `grc_officer`; `security_auditor`
+devops_assistant	`release_manager`; `infra_lead`	All crews (CI/CD, pipelines); `sre_engineer`
+customer_support	`technical_writer`; `knowledge_base`; user intake	`product_manager`; `planner`; `technical_writer`
+technical_writer	All crews (artifacts)	All crews (docs); `compliance_wiki_editor`

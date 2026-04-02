@@ -1,2 +1,16 @@
 .env
 mcp/gateway.env
+
+# Rust build output (scripts/management)
+scripts/management/target/
+
+# Crew per-agent runtime artifacts — not committed (see crew/README.md, workflow_contract.md).
+# Templates under crew/_template/ stay tracked via negation rules.
+crew/*/work_logs/
+!crew/_template/work_logs/
+!crew/_template/work_logs/**
+
+crew/*/TASKS_*.md
+crew/*/TASKS_*.MD
+!crew/_template/TASKS_TEMPLATE.md
+!crew/_template/worklog_TEMPLATE.md
