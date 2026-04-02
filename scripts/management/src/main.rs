@@ -42,9 +42,15 @@ async fn main() -> Result<()> {
         .await
         .context("PostgreSQL への接続に失敗しました（DATABASE_URL または POSTGRES_* / ZEROCLAW_DB_NAME を確認）")?;
 
-    schema::ensure_schema(&pool)
-        .await
-        .context("スキーマの適用に失敗しました")?;
+    // status は読み取り専用チェックに留め、DDL を走らせない（最小権限の DB ユーザーでも動かす）
+    match &cli.command {
+        Commands::Sync | Commands::Audit => {
+            schema::ensure_schema(&pool)
+                .await
+                .context("スキーマの適用に失敗しました")?;
+        }
+        Commands::Status => {}
+    }
 
     match &cli.command {
         Commands::Sync => sync_knowledge_base(&pool).await?,
@@ -117,7 +123,7 @@ async fn sync_knowledge_base(pool: &sqlx::PgPool) -> Result<()> {
         sqlx::query(
             r#"INSERT INTO documents (content, source_path, embedding)
                VALUES ($1, $2, $3)
-               ON CONFLICT (source_path) DO UPDATE SET
+               ON CONFLICT (source_path) WHERE source_path IS NOT NULL DO UPDATE SET
                  content = EXCLUDED.content,
                  embedding = EXCLUDED.embedding,
                  created_at = now()"#,
@@ -166,7 +172,7 @@ async fn sync_knowledge_base(pool: &sqlx::PgPool) -> Result<()> {
             sqlx::query(
                 r#"INSERT INTO documents (content, source_path, embedding)
                    VALUES ($1, $2, $3)
-                   ON CONFLICT (source_path) DO UPDATE SET
+                   ON CONFLICT (source_path) WHERE source_path IS NOT NULL DO UPDATE SET
                      content = EXCLUDED.content,
                      embedding = EXCLUDED.embedding,
                      created_at = now()"#,

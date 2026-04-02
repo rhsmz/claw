@@ -20,6 +20,7 @@ const STMTS: &[&str] = &[
 )"#,
     "CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx ON audit_logs (created_at DESC)",
     "CREATE INDEX IF NOT EXISTS documents_created_at_idx ON documents (created_at DESC)",
+    // ON CONFLICT 側に同じ述語が必要（部分ユニークの推論用）
     "CREATE UNIQUE INDEX IF NOT EXISTS documents_source_path_uidx ON documents (source_path) WHERE source_path IS NOT NULL",
 ];
 
