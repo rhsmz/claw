@@ -8,7 +8,7 @@
 |--------------|------|
 | 本 README | 構成・クイックスタート・トラブルシューティング |
 | [ENV.md](ENV.md) | `.env` / `mcp/gateway.env` の変数一覧と運用 |
-| [mcp/README.md](mcp/README.md) | MCP Gateway・`docker.sock`・Context7 |
+| [mcp/README.md](mcp/README.md) | MCP Gateway・40 スキルと `config.json` の対応・カタログ拡張 |
 | [Taskfile.yml](Taskfile.yml) | `task` コマンド（`task --list-all` で説明表示） |
 
 ## 構成概要
@@ -158,7 +158,7 @@ ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
 | タスク | 概要 |
 |--------|------|
 | `task` | タスク一覧表示 |
-| `task setup` | 初回準備（`init-env` + Unix では `chmod`） |
+| `task setup` | 初回準備（`.env` / `gateway.env` の雛形 + Unix では `chmod`） |
 | `task up` / `down` / `ps` / `logs` | Compose の基本操作 |
 | `task config` | `docker compose config` による検証 |
 | `task pull` | イメージの更新取得 |
@@ -176,23 +176,43 @@ ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
 | `docker-compose.yml` | サービス定義・ネットワーク・ボリューム |
 | `litellm_config.yaml` | LiteLLM のモデル一覧と Langfuse コールバック |
 | `postgres-init/01-init-databases.sh` | 初回のみ: 複数 DB 作成と `vector` 拡張 |
+| `postgres-init/02-imperial-management.sql` | 初回のみ: 管理 CLI 用 `documents` / `audit_logs`（任意で CLI の `ensure_schema` と二重でも可） |
 
 LiteLLM 経由で呼ぶモデル名は、`litellm_config.yaml` の `model_list[].model_name` と `.env` の `DEFAULT_MODEL`（ZeroClaw 用）を一致させてください。
 
-## Ollama と 外部API・MCPツールの連携
+## Ollama と 外部 API・MCP ツールの連携
 
-本スタックでは、推論モデルの選択だけでなく、MCP（Model Context Protocol）を通じて様々な外部ツールやローカルファイルと連携できます。
+推論だけでなく、**MCP（Model Context Protocol）** と **クラウド API** で調査・開発・インフラ・法務・通知まで幅広く繋げられます。エージェント側の「どのスキルがどの MCP サーバ名を指すか」の正は **`zeroclaw/config.toml` の `[[skills]]`（現状 40 件）** です。ゲートウェイが実際に起動するプロセスは **`mcp/config.json` の `mcpServers` キー**で定義します。両者の名前は一致させる必要があり、サンプルの `config.json` には **10 キー分**しか無いため、本番で使うスキルに応じて [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) 等を参照しエントリを増やしてください。詳細な対応表とギャップ一覧は **[mcp/README.md](mcp/README.md)**、環境変数は **[ENV.md](ENV.md)** を参照してください。
+
+### 推論・ゲートウェイ（HTTP API）
 
 | 種別 | 役割 | 設定の場所 |
 |------|------|------------|
 | **Ollama** | ローカル推論 | `litellm_config.yaml` の `ollama/...` と `api_base: http://ollama:11434` |
-| **OpenAI / Anthropic / Gemini** | クラウド推論（任意） | ルート `.env` の `OPENAI_API_KEY` 等。`docker-compose.yml` の `litellm` 経由で呼び出します。 |
-| **Context7 / Web検索** | ドキュメントや最新情報の取得 | `mcp/config.json` にサーバを追加し、ルート `.env` の `CONTEXT7_API_KEY` や `BRAVE_SEARCH_API_KEY` 等を設定（[ENV.md](ENV.md) 参照）。 |
-| **ファイルシステム / DB** | ローカルコードの編集、SQL実行 | `mcp/config.json` の `filesystem` / `postgres` と Compose のボリューム・DB 認証情報を組み合わせる。 |
-| **GitHub / Sentry** | Issue管理やエラーログの解析 | ルート `.env` の `GITHUB_PAT`（ゲートウェイでは `GITHUB_PERSONAL_ACCESS_TOKEN` として注入）や `SENTRY_AUTH_TOKEN` 等。 |
-| **Discord / Slack 等** | チャットへの通知 | ルート `.env` または `mcp/gateway.env` に Webhook / Bot トークンを記載（※漏洩リスクに注意。[ENV.md](ENV.md) 参照）。 |
+| **OpenAI / Anthropic / Google / Mistral 等** | クラウド推論（任意） | ルート `.env` の `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` / `MISTRAL_API_KEY` 等。`docker-compose.yml` の `litellm` 経由。 |
 
-Open WebUI では LiteLLM（ポート 4000）を OpenAI 互換エンドポイントにしているため、UI のモデル選択でローカルとクラウドを切り替えられます。Ollama にだけ直接 HTTP で繋ぐのではなく、**本スタックでは LiteLLM を経由する形**で外部モデルと揃えています。
+Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイントにしているため、UI のモデル選択でローカルとクラウドを切り替えられます。**本スタックでは推論は LiteLLM を軸に**揃えています。
+
+### MCP 連携のカテゴリ（スキル設計上の区分）
+
+以下は `config.toml` 上のスキル分類に対応する **代表的な連携先**です。個々のパッケージ名・起動方法は [mcp/README.md](mcp/README.md) のマトリクスと `mcp/config.json` を参照してください。
+
+| 区分 | 主な MCP サーバ ID（例） | 想定される外部サービス・リソース |
+|------|---------------------------|----------------------------------|
+| **知能・基盤** | `context7`, `sequential-thinking`, `time` | ドキュメント RAG、推論補助、時刻（`time` はサンプル `config.json` 未収載のため要追加） |
+| **調査・諜報** | `brave-search`, `arxiv`, `duckduckgo`, `wikipedia` | Brave、学術検索、一般 Web・百科（キー要否はサービス次第） |
+| **開発基盤** | `filesystem`, `github`, `python-shell`, `curl-executor`, `openapi-spec-tool` | ローカルファイル、GitHub、実行・HTTP テスト、OpenAPI |
+| **多言語実行** | `node-runtime`, `polyglot-sandbox`, `php-runtime`, `go-runtime`, `rust-runtime` および各 linter | コンテナ／サンドボックス上の JS・PHP・Go・Rust（`docker.sock` 利用に注意） |
+| **データ・構造** | `postgres`, `redis`, `mermaid-renderer` | DB・キャッシュ・図表（`mermaid` キー名との整合は mcp README 参照） |
+| **ドキュメント・法務** | `pdf-parser`, `legal-database-api`, `trademark-patent-search`, `web-scraper` | PDF、法務 DB、商標・特許、ガイドライン取得（契約・実装は別途） |
+| **品質・監視** | `sentry`, `browserbase`, `snyk`, `hashicorp-vault-mcp` | エラー監視、ブラウザ自動化、脆弱性、Vault |
+| **インフラ** | `aws`, `docker-mcp`, `kubernetes` | AWS、Docker、Kubernetes（資格情報は [ENV.md](ENV.md)） |
+| **連携・共有** | `discord`, `slack`, `notion`, `confluence` | 通知・Wiki・Confluence（トークンは `.env` / `mcp/gateway.env`、漏洩に注意） |
+
+### シークレットと Compose
+
+- **MCP 用**: `mcp/config.json` にサーバを足したうえで、ルート `.env`（`docker-compose.yml` の `mcp-gateway.environment` で補間される項目）や **`mcp/gateway.env.example` を元にした `mcp/gateway.env`** でキーを管理します。GitHub は `.env` の **`GITHUB_PAT`** がゲートウェイ内で `GITHUB_PERSONAL_ACCESS_TOKEN` として渡ります。
+- **Brave / Context7 / Sentry / Browserbase / Snyk / Vault / AWS / 通知・Notion / Confluence** 等の変数名の対応は **[ENV.md](ENV.md)** の表を参照してください。
 
 ## 注意事項・トラブルシューティング
 
