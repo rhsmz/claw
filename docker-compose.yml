@@ -107,10 +107,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # 既定トランスポートは stdio のため `up -d` だと stdin が閉じて即終了（exit 0）→ 再起動ループになる。
+    # ZeroClaw は http://mcp-gateway:8811/sse を前提にする。
+    command:
+      - gateway
+      - run
+      - --port=8811
+      - --transport=sse
+      - --config=/app/config.json
+      # Linux/WSL では Docker Desktop のシークレット API が無い。リポジトリ同梱のテンプレを参照（実キーは compose environment からも渡る）
+      - --secrets=/app/gateway-secrets.env
     ports:
       - "8811:8811"
     volumes:
       - ./mcp/config.json:/app/config.json:ro
+      - ./mcp/gateway.env.example:/app/gateway-secrets.env:ro
       - ./mcp/vault:/app/vault:ro
       # filesystem / git ローカル代替が参照するワークスペース
       # 依存削減のため external サービスではなく、こちらを読みます。

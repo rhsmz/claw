@@ -2,11 +2,11 @@
     "mcpServers": {
       "search": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"]
       },
       "github": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "args": ["-y", "@modelcontextprotocol/server-github"]
       },
       "postgres": {
         "command": "npx",
@@ -64,7 +64,7 @@
       },
       "context7": {
         "command": "npx",
-        "args": ["-y", "@context7/mcp-server"],
+        "args": ["-y", "@context7/mcp-server"]
       },
       "notion_snapshots": {
         "command": "npx",
