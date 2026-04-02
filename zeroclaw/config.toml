@@ -38,8 +38,7 @@ deferred_loading = false
 [[mcp.servers]]
 name = "docker-mcp-gateway"
 transport = "sse"
-# コンテナ内 DNS で mcp-gateway が解決できない環境があるため、compose の extra_hosts 済み host.docker.internal + 公開ポートへ接続
-url = "http://host.docker.internal:8811/sse"
+url = "http://mcp-gateway:8811/sse"
 command = ""
 args = []
 

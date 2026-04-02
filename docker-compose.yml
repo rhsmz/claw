@@ -107,15 +107,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # 既定トランスポートは stdio のため `up -d` だと stdin が閉じて即終了（exit 0）→ 再起動ループになる。
-    # ZeroClaw は http://mcp-gateway:8811/sse を前提にする。
+    # 既定トランスポートは stdio のため `up -d` だと stdin が閉じて即終了する。
+    # イメージの ENTRYPOINT は既に `mcp gateway run` まで含む。ここに `gateway`/`run` を足すと
+    # 「unknown command "gateway" for docker mcp gateway run」で exit 1 になる。
     command:
-      - gateway
-      - run
       - --port=8811
       - --transport=sse
       - --config=/app/config.json
-      # Linux/WSL では Docker Desktop のシークレット API が無い。リポジトリ同梱のテンプレを参照（実キーは compose environment からも渡る）
+      # Linux/WSL では Docker Desktop のシークレット API が無い。リポジトリ同梱のテンプレを参照
       - --secrets=/app/gateway-secrets.env
     ports:
       - "8811:8811"
@@ -160,9 +159,6 @@ services:
     image: ghcr.io/zeroclaw-labs/zeroclaw:latest
     restart: unless-stopped
     init: true
-    # MCP をホストの公開ポート経由で取りに行く（同一 compose 内 DNS が効かない WSL/一部環境の回避）
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     environment:
       ZEROCLAW_ALLOW_PUBLIC_BIND: "true"
       ZEROCLAW_GATEWAY_HOST: "0.0.0.0"
