@@ -43,7 +43,7 @@ services:
 
   # 新しいモデル（例: gemma4:e2b）はサーバ版が古いと pull で 412 になる。latest のキャッシュ stale 対策で既定タグを固定し、.env の OLLAMA_IMAGE で上書き可。
   ollama:
-    image: ${OLLAMA_IMAGE:-ollama/ollama:0.19.0}
+    image: ${OLLAMA_IMAGE:-ollama/ollama:0.20.0}
     restart: unless-stopped
     init: true
     volumes:
