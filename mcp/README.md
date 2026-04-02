@@ -67,7 +67,7 @@
 
 ## 3. 現行 `mcp/config.json` に含まれるサーバキー
 
-リポジトリに同梱されているサンプルでは、次の **10** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
+リポジトリに同梱されているサンプルでは、次の **12** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
 
 | `config.json` のキー | 備考 |
 |----------------------|------|
@@ -76,14 +76,16 @@
 | `postgres` | 接続文字列はファイル内。本番では環境変数化を推奨 |
 | `filesystem` | マウントパスは `args` で指定 |
 | `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
+| `notion` | Docker 経由 `mcp/notion`（`INTERNAL_INTEGRATION_TOKEN` が必要） |
 | `sequential-thinking` | |
 | `node-runtime` | ホストの `docker.sock` をゲートウェイから利用 |
 | `polyglot-sandbox` | カスタムイメージ `imperial-polyglot-runner:latest` |
 | `sentry` | |
 | `context7` | `CONTEXT7_API_KEY` |
+| `confluence` | Docker 経由 `guang1/confluence-mcp:latest`（Atlassian 用の env が必要） |
 | `mermaid` | `mcp_server` 名 `mermaid-renderer` との整合要確認 |
 
-未登録の例: `time`, `arxiv`, `duckduckgo`, `wikipedia`, `python-shell`, `redis`, `aws`, `kubernetes`, `notion`, `confluence` など。必要なサーバは [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) や各パッケージの README を参照し、`config.json` に追記してください。
+未登録の例: `time`, `arxiv`, `duckduckgo`, `wikipedia`, `python-shell`, `redis`, `aws`, `kubernetes` など。必要なサーバは [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) や各パッケージの README を参照し、`config.json` に追記してください。
 
 ---
 
