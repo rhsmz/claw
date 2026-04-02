@@ -41,9 +41,9 @@ services:
       timeout: 3s
       retries: 5
 
-  # 新しいモデル（例: gemma4:e2b）はサーバ版が古いと pull で 412 になる。latest のキャッシュ stale 対策で既定タグを固定し、.env の OLLAMA_IMAGE で上書き可。
+  # 新しいモデル（例: gemma4:e2b）はサーバ版が古いと pull で 412 になる。latest のキャッシュ stale 対策で既定タグを固定し、.env の OLLAMA_IMAGE で上書き可（現状は pre-release の 0.20.0-rc1）。
   ollama:
-    image: ${OLLAMA_IMAGE:-ollama/ollama:0.20.0}
+    image: ${OLLAMA_IMAGE:-ollama/ollama:0.20.0-rc1}
     restart: unless-stopped
     init: true
     volumes:
