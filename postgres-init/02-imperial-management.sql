@@ -17,6 +17,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- hexa-rag-mcp の incremental ingest が参照するテーブル（CREATE IF NOT EXISTS で冪等化）
+CREATE TABLE IF NOT EXISTS sync_state (
+    source_path TEXT PRIMARY KEY,
+    last_mtime  TIMESTAMPTZ,
+    file_hash   TEXT
+);
+
 CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx ON audit_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS documents_created_at_idx ON documents (created_at DESC);
 

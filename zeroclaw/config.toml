@@ -524,7 +524,7 @@ temperature = 0.1
 
 [[skills]]
 name = "knowledge_base"
-mcp_server = "context7" # 過去ログ・社内知見
+mcp_server = "hexa_rag" # ローカル RAG（Markdown -> pgvector）
 
 [[skills]]
 name = "logical_reasoning"
@@ -548,7 +548,7 @@ mcp_server = "duckduckgo"
 
 [[skills]]
 name = "knowledge_base_lookup"
-mcp_server = "wikipedia"
+mcp_server = "hexa_rag"
 
 [[skills]]
 name = "filesystem"

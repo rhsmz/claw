@@ -91,6 +91,17 @@ tasks:
     cmds:
       - "{{.DOCKER_COMPOSE}} exec ollama ollama pull {{.VANILLA_MODEL}}"
 
+  hexa-ollama-pull:
+    desc: hexa-rag-mcp 用の埋め込み/LLM モデルを取得
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec ollama ollama pull bge-m3"
+      - "{{.DOCKER_COMPOSE}} exec ollama ollama pull qwen2.5:7b"
+
+  rag-ingest:
+    desc: hexa-rag-mcp のベクトルDBを wiki/ から取り込み
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec -T mcp-gateway npx -y @hyphaene/hexa-rag-mcp --config /app/workspace/hexa-vector.config.json ingest --incremental"
+
   polyglot-build:
     desc: 多言語実行サンドボックス (JS/PHP/Go/Rust) を再構築
     cmds:

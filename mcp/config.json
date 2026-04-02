@@ -61,6 +61,16 @@
       "mermaid": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-mermaid"]
+      },
+      "hexa_rag": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@hyphaene/hexa-rag-mcp",
+          "--config",
+          "/app/workspace/hexa-vector.config.json",
+          "serve"
+        ]
       }
     }
   }

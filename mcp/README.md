@@ -22,13 +22,13 @@
 
 | カテゴリ | スキル名 (`name`) | `mcp_server` |
 |----------|-------------------|--------------|
-| 知能・基盤 | `knowledge_base` | `context7` |
+| 知能・基盤 | `knowledge_base` | `hexa_rag` |
 | | `logical_reasoning` | `sequential-thinking` |
 | | `time_management` | `time` |
 | 調査・諜報 | `market_research` | `brave-search` |
 | | `academic_research` | `arxiv` |
 | | `web_search` | `duckduckgo` |
-| | `knowledge_base_lookup` | `wikipedia` |
+| | `knowledge_base_lookup` | `hexa_rag` |
 | 開発基盤 | `filesystem` | `filesystem` |
 | | `github_api` | `github` |
 | | `code_interpreter` | `python-shell` |
@@ -67,7 +67,7 @@
 
 ## 3. 現行 `mcp/config.json` に含まれるサーバキー
 
-リポジトリに同梱されているサンプルでは、次の **12** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
+リポジトリに同梱されているサンプルでは、次の **13** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
 
 | `config.json` のキー | 備考 |
 |----------------------|------|
@@ -78,6 +78,7 @@
 | `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
 | `notion_snapshots` | ローカルスナップショット（`./wiki/notion`） |
 | `sequential-thinking` | |
+| `hexa_rag` | ローカル RAG（Markdown -> pgvector） |
 | `node-runtime` | ホストの `docker.sock` をゲートウェイから利用 |
 | `polyglot-sandbox` | カスタムイメージ `imperial-polyglot-runner:latest` |
 | `sentry` | |

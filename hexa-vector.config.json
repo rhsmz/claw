@@ -1,0 +1,27 @@
+{
+  "sources": [
+    {
+      "name": "notion",
+      "type": "knowledge",
+      "path": "/app/wiki/notion",
+      "patterns": ["**/*.md"],
+      "exclude": ["**/node_modules/**"]
+    },
+    {
+      "name": "confluence",
+      "type": "knowledge",
+      "path": "/app/wiki/confluence",
+      "patterns": ["**/*.md"],
+      "exclude": ["**/node_modules/**"]
+    }
+  ],
+  "models": {
+    "embedding": "bge",
+    "reranker": "qllama/bge-reranker-v2-m3",
+    "llm": "qwen"
+  },
+  "chunking": {
+    "maxTokens": 500,
+    "overlap": 50
+  }
+}

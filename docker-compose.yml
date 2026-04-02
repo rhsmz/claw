@@ -108,6 +108,7 @@ services:
       - ./docker-compose.yml:/app/workspace/docker-compose.yml:ro
       - ./litellm_config.yaml:/app/workspace/litellm_config.yaml:ro
       - ./.env.example:/app/workspace/.env.example:ro
+      - ./hexa-vector.config.json:/app/workspace/hexa-vector.config.json:ro
       - ./wiki:/app/wiki:ro
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -115,6 +116,13 @@ services:
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      # hexa-rag-mcp (local RAG)
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${ZEROCLAW_DB_NAME}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      OLLAMA_HOST: http://ollama:11434
 
   zeroclaw:
     profiles: ["zeroclaw"]
