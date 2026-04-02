@@ -6,7 +6,7 @@ model_list:
   # ---------------------------------------------------------------------------
   # 1. バニラ設定: ローカル推論エンジン (Ollama)
   # ---------------------------------------------------------------------------
-  # 帝国の標準OS。コストゼロで24時間稼働する基幹モデル。
+  # 帝国の標準OS。Ollama 上の gemma4:e2b（litellm_params.model は ollama/gemma4:e2b）。
   
   - model_name: imperial-logic-high-v1  # 指揮官・アーキテクト・法務用
     litellm_params:
@@ -36,12 +36,7 @@ model_list:
       timeout: 300
 
   # model_list に無い名前は OpenAI 互換パススルー扱いになり、OPENAI_API_KEY で 401 になり得る。
-  # Ollama で pull したモデルを UI から選ぶ場合は、ここに model_name を足す（Ollama 側名と一致させる）。
-  - model_name: gemma3:12b
-    litellm_params:
-      model: ollama/gemma3:12b
-      api_base: http://ollama:11434
-      timeout: 300
+  # 別の Ollama モデルを UI から使う場合は、下に model_name / ollama/... を追加する。
 
   # ---------------------------------------------------------------------------
   # 2. 追加設定: クラウドLLM (必要に応じてコメントアウトを解除して有効化)

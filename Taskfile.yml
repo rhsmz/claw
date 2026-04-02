@@ -149,7 +149,7 @@ tasks:
   # 3. 兵装整備 (Model & Runtime Logistics)
   # ---------------------------------------------------------------------------
   ollama-pull:
-    desc: "Ollama でモデルを pull（既定 VANILLA_MODEL。上書き例: task ollama-pull -- MODEL=gemma3:12b）"
+    desc: "Ollama でモデルを pull（既定 VANILLA_MODEL=gemma4:e2b。上書き例: task ollama-pull -- MODEL=llama3.1）"
     cmds:
       - '{{.DOCKER_COMPOSE}} exec ollama ollama pull {{if .MODEL}}{{.MODEL}}{{else}}{{.VANILLA_MODEL}}{{end}}'
 
