@@ -230,6 +230,8 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
   - **推論が 404 / model not found** `DEFAULT_MODEL`・`litellm_config.yaml` の `model_name`・Ollama 内の `ollama list` の三者が一致しているか確認してください。
 
+  - **推論が 401 / OpenAI `invalid_api_key`（ローカルモデル名なのに）** LiteLLM は **`model_list` に無いモデル名**を OpenAI API 向けに送ります（`OPENAI_API_KEY` が検証される）。Ollama で使いたい名前（例: `gemma3:12b`）は **`litellm_config.yaml` に `ollama/...` と `api_base: http://ollama:11434` で追加**し、コンテナを再起動してください。`docker compose exec ollama ollama list` でイメージが存在するかも確認します。
+
   - **ZeroClaw イメージ** 配布イメージに関する報告が [Issue \#3687](https://github.com/zeroclaw-labs/zeroclaw/issues/3687) などにあります。起動しない場合はタグの固定やビルド元の確認を検討してください。
 
   - **データの完全削除** `task down-volumes`（`docker compose down -v`）は PostgreSQL・Ollama・WebUI などの名前付きボリュームを削除します。復元できないので、実行前に内容を確認してください。
