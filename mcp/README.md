@@ -22,7 +22,7 @@
 
 | カテゴリ | スキル名 (`name`) | `mcp_server` |
 |----------|-------------------|--------------|
-| 知能・基盤 | `knowledge_base` | `filesystem` |
+| 知能・基盤 | `knowledge_base` | `context7` |
 | | `logical_reasoning` | `sequential-thinking` |
 | | `time_management` | `time` |
 | 調査・諜報 | `market_research` | `brave-search` |
@@ -30,7 +30,7 @@
 | | `web_search` | `duckduckgo` |
 | | `knowledge_base_lookup` | `wikipedia` |
 | 開発基盤 | `filesystem` | `filesystem` |
-| | `github_api` | `git` |
+| | `github_api` | `github` |
 | | `code_interpreter` | `python-shell` |
 | | `api_testing` | `curl-executor` |
 | | `api_spec_manager` | `openapi-spec-tool` |

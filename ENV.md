@@ -80,7 +80,7 @@ Windows（cmd）の例: `copy .env.example .env`
 
 | MCP サーバ ID（`config.toml`） | 主な環境変数・備考 |
 |-------------------------------|-------------------|
-| `context7` | `CONTEXT7_API_KEY`（knowledge_base はデフォルトで `filesystem` を使用。context7 はオプション） |
+| `context7` | `CONTEXT7_API_KEY` |
 | `sequential-thinking` | 通常はキー不要 |
 | `time` | **現状 `mcp/config.json` に未定義**。ゲートウェイへサーバ追加が必要 |
 | `brave-search` | `BRAVE_SEARCH_API_KEY`（サンプル `config.json` ではキー名 `search` — 名前の整合は [mcp/README.md](mcp/README.md) 参照） |

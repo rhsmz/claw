@@ -199,9 +199,9 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
 | 区分 | 主な MCP サーバ ID（例） | 想定される外部サービス・リソース |
 |------|---------------------------|----------------------------------|
-| **知能・基盤** | `filesystem`, `sequential-thinking`, `time` | ローカルファイルからのナレッジ抽出、推論補助、時刻（`time` はサンプル `config.json` 未収載のため要追加） |
+| **知能・基盤** | `context7`, `sequential-thinking`, `time` | ドキュメント RAG、推論補助、時刻（`time` はサンプル `config.json` 未収載のため要追加） |
 | **調査・諜報** | `brave-search`, `arxiv`, `duckduckgo`, `wikipedia` | Brave、学術検索、一般 Web・百科（キー要否はサービス次第） |
-| **開発基盤** | `filesystem`, `git`, `python-shell`, `curl-executor`, `openapi-spec-tool` | ローカルファイル、ローカル git、実行・HTTP テスト、OpenAPI |
+| **開発基盤** | `filesystem`, `github`, `python-shell`, `curl-executor`, `openapi-spec-tool` | ローカルファイル、GitHub、実行・HTTP テスト、OpenAPI |
 | **多言語実行** | `node-runtime`, `polyglot-sandbox`, `php-runtime`, `go-runtime`, `rust-runtime` および各 linter | コンテナ／サンドボックス上の JS・PHP・Go・Rust（`docker.sock` 利用に注意） |
 | **データ・構造** | `postgres`, `redis`, `mermaid-renderer` | DB・キャッシュ・図表（`mermaid` キー名との整合は mcp README 参照） |
 | **ドキュメント・法務** | `pdf-parser`, `legal-database-api`, `trademark-patent-search`, `web-scraper` | PDF、法務 DB、商標・特許、ガイドライン取得（契約・実装は別途） |

@@ -524,7 +524,7 @@ temperature = 0.1
 
 [[skills]]
 name = "knowledge_base"
-mcp_server = "filesystem" # ローカルファイルからナレッジ抽出（context7 はオプション）
+mcp_server = "context7" # 過去ログ・社内知見
 
 [[skills]]
 name = "logical_reasoning"
@@ -556,7 +556,7 @@ mcp_server = "filesystem"
 
 [[skills]]
 name = "github_api"
-mcp_server = "git" # ローカル git から取得（外部 GitHub はオプション）
+mcp_server = "github"
 
 [[skills]]
 name = "code_interpreter"
