@@ -35,12 +35,11 @@ tasks:
       初期セットアップを全自動で行います。
       1. .env ファイルの生成
       2. 必要な作業ディレクトリの作成
-      3. DB初期化スクリプトへの実行権限付与
+      3. DB初期化スクリプトの配置（docker-compose 起動時に自動実行）
     cmds:
       - cp -n .env.example .env || true
       - cp -n mcp/gateway.env.example mcp/gateway.env || true
       - mkdir -p prompts skills storage/postgres mcp/vault
-      - chmod +x postgres-init/01-init-databases.sh
       - echo "建国準備完了。各 .env にAPIキーを入力後、'task up' を実行してください。"
 
   # ---------------------------------------------------------------------------

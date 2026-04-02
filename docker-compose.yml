@@ -14,8 +14,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${ZEROCLAW_DB_NAME}
+      # 01-init-databases.sql が参照するため postgres コンテナ側にも渡す
+      ZEROCLAW_DB_NAME: ${ZEROCLAW_DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:

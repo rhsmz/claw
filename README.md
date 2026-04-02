@@ -85,25 +85,10 @@ task setup
 
 **MCP Gateway** 用に、`mcp/gateway.env` がまだ無い場合は `mcp/gateway.env.example` をコピーして作成します（`task setup` に含まれる）。手動の例: `cp mcp/gateway.env.example mcp/gateway.env`。ゲートウェイが起動する MCP サーバの一覧は **`mcp/config.json`** で定義します。コンテナへ渡すシークレットの一部はルート `.env` から `docker-compose.yml` の `mcp-gateway.environment` で補間されます（`mcp/gateway.env` は既定では `env_file` として読み込まれません）。変数の対応表は [ENV.md](ENV.md)、スキルとの整合は [mcp/README.md](mcp/README.md) を参照してください。
 
-### 2\. PostgreSQL 初期化スクリプトの実行権限（Linux / macOS）
+### 2\. PostgreSQL 初期化スクリプトの自動実行
 
-公式 PostgreSQL イメージは、**実行可能な** `.sh` のみをサブプロセスで実行します。初回起動前に:
-
-```bash
-chmod +x postgres-init/01-init-databases.sh
-```
-
-Task 利用時:
-
-```bash
-task postgres-init-perm
-```
-
-上記をまとめて実行する場合:
-
-```bash
-task setup
-```
+公式 PostgreSQL イメージは、`docker-entrypoint-initdb.d` に配置された `.sql` を**初回起動時に自動実行**します。
+本リポジトリでは `docker-compose.yml` が `postgres-init/` をマウントするため、実行権限付与や手動実行は不要です（`docker compose up -d` / `task up` で反映）。
 
 ### 3\. 設定の検証と起動
 
@@ -175,7 +160,7 @@ ZeroClaw のポートは `.env` の `ZEROCLAW_GATEWAY_PORT` に従います。
 | `mcp/README.md` | MCP Gateway の設定方針（カタログ・`docker.sock`・クライアント接続） |
 | `docker-compose.yml` | サービス定義・ネットワーク・ボリューム |
 | `litellm_config.yaml` | LiteLLM のモデル一覧と Langfuse コールバック |
-| `postgres-init/01-init-databases.sh` | 初回のみ: 複数 DB 作成と `vector` 拡張 |
+| `postgres-init/01-init-databases.sql` | 初回のみ: 複数 DB 作成と `vector` 拡張 |
 | `postgres-init/02-imperial-management.sql` | 初回のみ: 管理 CLI 用 `documents` / `audit_logs`（任意で CLI の `ensure_schema` と二重でも可） |
 
 LiteLLM 経由で呼ぶモデル名は、`litellm_config.yaml` の `model_list[].model_name` と `.env` の `DEFAULT_MODEL`（ZeroClaw 用）を一致させてください。
