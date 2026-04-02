@@ -1,5 +1,6 @@
 # Compose V2 形式（version キーは不要）。
-# 既定: Postgres / Redis / Ollama / LiteLLM / MCP Gateway / Stack Portal（各 UI へのリンク・既定 :8042）
+# 既定: Postgres / Redis / LiteLLM / MCP Gateway / Stack Portal（各 UI へのリンク・既定 :8042）
+# Ollama コンテナ: プロファイル ollama-docker（.env の OLLAMA_LAUNCH_LOCATION=docker か task up 利用時）
 # Web UI（Open WebUI :8080 / Langfuse :3000）: docker compose --profile ui up -d
 # ZeroClaw: docker compose --profile zeroclaw up -d
 # 参考: https://docs.docker.com/compose/ / ZeroClaw deployment（公式イメージ・設定マウント）
@@ -42,7 +43,9 @@ services:
       retries: 5
 
   # 新しいモデル（例: gemma4:e2b）はサーバ版が古いと pull で 412 になる。latest のキャッシュ stale 対策で既定タグを固定し、.env の OLLAMA_IMAGE で上書き可（現状は pre-release の 0.20.0-rc1）。
+  # ホスト上の Ollama（Windows ネイティブ等）を使う場合は OLLAMA_LAUNCH_LOCATION=host とし、このサービスは起動しない（task up / scripts/docker-compose-with-ollama.* 参照）。
   ollama:
+    profiles: ["ollama-docker"]
     image: ${OLLAMA_IMAGE:-ollama/ollama:0.20.0-rc1}
     restart: unless-stopped
     init: true
@@ -66,8 +69,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
       # Prisma baseline / diff 用（同一 DB に postgres-init があると P3005 → baseline 処理が走る）
@@ -78,6 +81,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      # Ollama 到達先: コンテナ内 http://ollama:11434 / ホスト Ollama は http://host.docker.internal:11434（OLLAMA_LAUNCH_LOCATION=host）
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-http://ollama:11434}
       POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
       REDIS_URL: redis://redis:6379/0
       LITELLM_MIGRATION_DIR: /var/lib/litellm-migrations
@@ -260,6 +265,8 @@ services:
     # 公式イメージ（Docker Hub Verified）。`mcp/gateway` は存在せず pull が拒否される
     image: docker/mcp-gateway:v2
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -312,7 +319,7 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       # @modelcontextprotocol/server-postgres は接続文字列を CLI 引数で要求するため、envmcp 経由で DATABASE_URL から生成
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
-      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_HOST: ${OLLAMA_API_BASE:-http://ollama:11434}
 
   zeroclaw:
     profiles: ["zeroclaw"]

@@ -54,7 +54,7 @@ flowchart LR
 ### Docker Compose（本リポジトリの現状）
 
 - **Compose ファイル**は V2 形式です（トップレベル `version` は未使用）。プロジェクト名は **`name: zeroclaw-enterprise`** で固定しています。CLI は **`docker compose`**（ハイフン無し）を想定しています（`task` からも同様）。
-- **既定の `docker compose up -d`**（または `task up`）では **PostgreSQL・Redis・Ollama・LiteLLM・MCP Gateway・Stack Portal（静的リンク集、既定 :8042）** を起動します。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、LiteLLM は Postgres / Redis / Ollama が **healthy** になるまで待ってから起動します。`litellm_config.yaml` はルートをマウントし、`.env` の `DEFAULT_MODEL`（例: `gemma4:e2b`）向けに `model_list` へエイリアスを用意しています。
+- **既定の `task up`** では **PostgreSQL・Redis・LiteLLM・MCP Gateway・Stack Portal（既定 :8042）** に加え、`.env` の **`OLLAMA_LAUNCH_LOCATION=docker`（既定）** のときだけ **Ollama コンテナ**（プロファイル `ollama-docker`）を起動します。**`OLLAMA_LAUNCH_LOCATION=host`（別名 `windows`）** のときは Ollama コンテナは起動せず、**ホスト上の Ollama**（例: Windows ネイティブ）へ `OLLAMA_API_BASE`（未設定時は `http://host.docker.internal:11434`）で接続します。手動で `docker compose up -d` だけ使う場合は、Docker 版 Ollama を使うとき **`--profile ollama-docker`** が必要です。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、`task up` は **`docker compose up -d --wait`** でヘルス待ちします（Compose v2.29+ 推奨。未対応ならスクリプトから `--wait` を外してください）。`litellm_config.yaml` の Ollama `api_base` は **`OLLAMA_API_BASE` 環境変数**（`os.environ/OLLAMA_API_BASE`）を参照します。
 - **Open WebUI（:8080）と Langfuse（:3000）** は **プロファイル `ui`** で起動します（ClickHouse / MinIO / Langfuse 専用 Redis を同梱）。初回はイメージ取得と DB マイグレーションで **数分**かかることがあります。例: `docker compose --profile ui up -d` または **`task up-with-ui`**。`.env` の `OPEN_WEBUI_SECRET_KEY` と `LANGFUSE_*`（`LANGFUSE_ENCRYPTION_KEY` は `openssl rand -hex 32` 推奨）を起動前に変更してください。
 - **ZeroClaw** は **`ghcr.io/zeroclaw-labs/zeroclaw:latest`** を **プロファイル `zeroclaw`** で任意起動します。公式デプロイに合わせ **`zeroclaw_data` ボリューム**（`/zeroclaw-data`）にワークスペースを保持し、**`zeroclaw/config.toml` を `.../.zeroclaw/config.toml` に read-only マウント**します。`[[crews]]` を含む本リポジトリの設定は OSS 版と完全には一致しない可能性があるため、起動しない場合は `zeroclaw doctor` / ログで照合してください。起動例: `docker compose --profile zeroclaw up -d` または `task up-with-zeroclaw`。
 - 初回は Ollama 側でモデルを取得してください（例: `task ollama-pull`）。
@@ -107,7 +107,8 @@ Task を使わない場合:
 
 ```bash
 docker compose config --quiet
-docker compose up -d
+# Ollama をコンテナで動かすとき（ホスト Ollama のときは .env で OLLAMA_API_BASE を合わせ、プロファイルは付けない）
+docker compose --profile ollama-docker up -d
 ```
 
 ### 4\. モデルの取得
@@ -152,7 +153,7 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 |--------|------|
 | `task` | タスク一覧表示 |
 | `task setup` | 初回準備（`.env` / `gateway.env`・`wiki/notion` 等のディレクトリ） |
-| `task up` / `task down` | コアスタックの起動・停止 |
+| `task up` / `task down` | コアスタックの起動・停止（`OLLAMA_LAUNCH_LOCATION` で Ollama コンテナ or ホスト） |
 | `task ps` / `task status` | `docker compose ps` |
 | `task logs` / `task logs-mcp` / `task logs-ui` / `task logs-zeroclaw` | サービス別ログ追跡 |
 | `task up-with-ui` | Open WebUI（8080）・Langfuse（3000）（`--profile ui`） |
@@ -161,7 +162,8 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 | `task config` / `task compose-validate` | `docker compose config --quiet` |
 | `task pull` | `docker compose pull`（イメージ更新取得） |
 | `task down-volumes` | ボリュームごと削除（**データ全消去**・確認プロンプトあり） |
-| `task ollama-pull` | Ollama でモデル取得（上書き: `task ollama-pull -- MODEL=...`） |
+| `task ollama-pull` | Ollama でモデル取得（`docker`=コンテナ内 / `host`=ホスト CLI。上書き: `task ollama-pull -- MODEL=...`） |
+| `task logs-ollama-docker` | Compose 内 Ollama のログ（コンテナ運用時のみ） |
 | `task hexa-ollama-pull` / `task rag-ingest` | ローカル RAG（hexa-rag）用モデル取得・ingest |
 | `task mcp-sync` | `mcp-gateway` 再起動 |
 | `task test` | `docker compose config` + `cargo test`（`scripts/management`） |
@@ -176,7 +178,8 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 | `mcp/gateway.env` | MCP ツール用シークレット（`.gitignore` 済み。`gateway.env.example` から作成） |
 | `mcp/README.md` | MCP Gateway の設定方針（カタログ・`docker.sock`・クライアント接続） |
 | `docker-compose.yml` | サービス定義・ネットワーク・ボリューム |
-| `litellm_config.yaml` | LiteLLM のモデル一覧と Langfuse コールバック |
+| `litellm_config.yaml` | LiteLLM のモデル一覧と Langfuse コールバック（Ollama の `api_base` は `OLLAMA_API_BASE`） |
+| `scripts/docker-compose-with-ollama.sh` / `.ps1` | `OLLAMA_LAUNCH_LOCATION` に応じて Compose に `ollama-docker` プロファイルを付与し `OLLAMA_API_BASE` を補う（`task up` 系から利用） |
 | `postgres-init/01-init-databases.sql` | 初回のみ: 複数 DB 作成と `vector` 拡張 |
 | `postgres-init/02-imperial-management.sql` | 初回のみ: 管理 CLI 用 `documents` / `audit_logs`（任意で CLI の `ensure_schema` と二重でも可） |
 

@@ -60,27 +60,103 @@ tasks:
   # 2. 進軍・戦線展開 (Infrastructure Control)
   # ---------------------------------------------------------------------------
   up:
-    desc: コアスタックを起動（Postgres / Redis / Ollama / LiteLLM / MCP Gateway）
+    desc: コアスタックを起動（OLLAMA_LAUNCH_LOCATION に応じて Ollama コンテナ or ホスト Ollama。README / ENV.md）
     cmds:
-      - "{{.DOCKER_COMPOSE}} up -d"
+      - task: stack-up
+
+  stack-up:
+    internal: true
+    cmds:
+      - task: stack-up-unix
+        platforms: [linux, darwin]
+      - task: stack-up-windows
+        platforms: [windows]
+
+  stack-up-unix:
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-with-ollama.sh up -d --wait
+      - task: status
+
+  stack-up-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-with-ollama.ps1 up -d --wait
       - task: status
 
   up-with-zeroclaw:
     desc: ZeroClaw コンテナも起動（--profile zeroclaw。OSS イメージと config の互換は要確認）
     cmds:
-      - "{{.DOCKER_COMPOSE}} --profile zeroclaw up -d"
+      - task: stack-up-with-zeroclaw
+
+  stack-up-with-zeroclaw:
+    internal: true
+    cmds:
+      - task: stack-up-with-zeroclaw-unix
+        platforms: [linux, darwin]
+      - task: stack-up-with-zeroclaw-windows
+        platforms: [windows]
+
+  stack-up-with-zeroclaw-unix:
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-with-ollama.sh --profile zeroclaw up -d --wait
+      - task: status
+
+  stack-up-with-zeroclaw-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-with-ollama.ps1 --profile zeroclaw up -d --wait
       - task: status
 
   up-with-ui:
     desc: Open WebUI（:8080）と Langfuse（:3000）を起動（--profile ui。初回は .env に LANGFUSE_* 等が必要）
     cmds:
-      - "{{.DOCKER_COMPOSE}} --profile ui up -d"
+      - task: stack-up-with-ui
+
+  stack-up-with-ui:
+    internal: true
+    cmds:
+      - task: stack-up-with-ui-unix
+        platforms: [linux, darwin]
+      - task: stack-up-with-ui-windows
+        platforms: [windows]
+
+  stack-up-with-ui-unix:
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-with-ollama.sh --profile ui up -d --wait
+      - task: status
+
+  stack-up-with-ui-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-with-ollama.ps1 --profile ui up -d --wait
       - task: status
 
   up-full:
     desc: コア + Web UI + ZeroClaw を一括起動（--profile ui --profile zeroclaw）
     cmds:
-      - "{{.DOCKER_COMPOSE}} --profile ui --profile zeroclaw up -d"
+      - task: stack-up-full
+
+  stack-up-full:
+    internal: true
+    cmds:
+      - task: stack-up-full-unix
+        platforms: [linux, darwin]
+      - task: stack-up-full-windows
+        platforms: [windows]
+
+  stack-up-full-unix:
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-with-ollama.sh --profile ui --profile zeroclaw up -d --wait
+      - task: status
+
+  stack-up-full-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-with-ollama.ps1 --profile ui --profile zeroclaw up -d --wait
       - task: status
 
   test:
@@ -111,9 +187,22 @@ tasks:
       - task: status
 
   pull:
-    desc: Compose サービスのイメージを更新取得（docker compose pull）
+    desc: Compose サービスのイメージを更新取得（OLLAMA_LAUNCH_LOCATION=docker 時は ollama 用プロファイル付き）
     cmds:
-      - "{{.DOCKER_COMPOSE}} pull"
+      - task: compose-pull-unix
+        platforms: [linux, darwin]
+      - task: compose-pull-windows
+        platforms: [windows]
+
+  compose-pull-unix:
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-with-ollama.sh pull
+
+  compose-pull-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-with-ollama.ps1 pull
 
   down:
     desc: 戦線を縮小し、全軍を帰還させる（コンテナ停止）
@@ -126,9 +215,14 @@ tasks:
       - "{{.DOCKER_COMPOSE}} ps"
 
   logs:
-    desc: コアサービス（litellm / ollama / postgres / mcp-gateway）のログを追跡
+    desc: コアサービス（litellm / postgres / mcp-gateway / redis）のログを追跡（Ollama コンテナは logs-ollama-docker）
     cmds:
-      - "{{.DOCKER_COMPOSE}} logs -f litellm ollama postgres mcp-gateway"
+      - "{{.DOCKER_COMPOSE}} logs -f litellm postgres mcp-gateway redis"
+
+  logs-ollama-docker:
+    desc: Compose 内 Ollama のログ（OLLAMA_LAUNCH_LOCATION=docker かつ起動時のみ）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} --profile ollama-docker logs -f ollama"
 
   logs-mcp:
     desc: MCP Gateway のログ
@@ -149,15 +243,42 @@ tasks:
   # 3. 兵装整備 (Model & Runtime Logistics)
   # ---------------------------------------------------------------------------
   ollama-pull:
-    desc: "Ollama でモデルを pull（既定 VANILLA_MODEL=gemma4:e2b。上書き例: task ollama-pull -- MODEL=llama3.1）"
+    desc: "Ollama でモデルを pull（host=ホストの ollama CLI / docker=コンテナ。上書き: task ollama-pull -- MODEL=llama3.1）"
     cmds:
-      - '{{.DOCKER_COMPOSE}} exec ollama ollama pull {{if .MODEL}}{{.MODEL}}{{else}}{{.VANILLA_MODEL}}{{end}}'
+      - task: ollama-pull-unix
+        platforms: [linux, darwin]
+      - task: ollama-pull-windows
+        platforms: [windows]
+
+  ollama-pull-unix:
+    internal: true
+    cmds:
+      - bash scripts/ollama-pull.sh '{{if .MODEL}}{{.MODEL}}{{else}}{{.VANILLA_MODEL}}{{end}}'
+
+  ollama-pull-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ollama-pull.ps1 '{{if .MODEL}}{{.MODEL}}{{else}}{{.VANILLA_MODEL}}{{end}}'
 
   hexa-ollama-pull:
     desc: hexa-rag-mcp 用の埋め込み・LLM モデル（hexa-vector.config.json の bge / qwen 想定）
     cmds:
-      - "{{.DOCKER_COMPOSE}} exec ollama ollama pull bge-m3"
-      - "{{.DOCKER_COMPOSE}} exec ollama ollama pull qwen2.5:7b"
+      - task: hexa-ollama-pull-unix
+        platforms: [linux, darwin]
+      - task: hexa-ollama-pull-windows
+        platforms: [windows]
+
+  hexa-ollama-pull-unix:
+    internal: true
+    cmds:
+      - bash scripts/ollama-pull.sh bge-m3
+      - bash scripts/ollama-pull.sh qwen2.5:7b
+
+  hexa-ollama-pull-windows:
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ollama-pull.ps1 bge-m3
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ollama-pull.ps1 qwen2.5:7b
 
   rag-ingest:
     desc: ローカル RAG（hexa-rag）— wiki/notion・wiki/confluence の MD を ingest（mcp-gateway 起動必須）

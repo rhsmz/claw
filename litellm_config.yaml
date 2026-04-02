@@ -11,7 +11,7 @@ model_list:
   - model_name: imperial-logic-high-v1  # 指揮官・アーキテクト・法務用
     litellm_params:
       model: ollama/gemma4:e2b
-      api_base: http://ollama:11434
+      api_base: os.environ/OLLAMA_API_BASE
       timeout: 300
       tpm: 100000
       rpm: 1000
@@ -19,20 +19,20 @@ model_list:
   - model_name: imperial-build-knight-v1 # 開発部隊・ウィザード用
     litellm_params:
       model: ollama/gemma4:e2b
-      api_base: http://ollama:11434
+      api_base: os.environ/OLLAMA_API_BASE
       timeout: 600
 
   - model_name: imperial-scout-mini-v1  # 調査・諜報・サポート・文書生成用
     litellm_params:
       model: ollama/gemma4:e2b
-      api_base: http://ollama:11434
+      api_base: os.environ/OLLAMA_API_BASE
       timeout: 120
 
   # .env の DEFAULT_MODEL（例: gemma4:e2b）と zeroclaw/config.toml の model を一致させる
   - model_name: gemma4:e2b
     litellm_params:
       model: ollama/gemma4:e2b
-      api_base: http://ollama:11434
+      api_base: os.environ/OLLAMA_API_BASE
       timeout: 300
 
   # model_list に無い名前は OpenAI 互換パススルー扱いになり、OPENAI_API_KEY で 401 になり得る。
