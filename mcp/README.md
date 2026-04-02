@@ -73,7 +73,7 @@
 |----------------------|------|
 | `search` | Brave Search |
 | `github` | `GITHUB_PERSONAL_ACCESS_TOKEN`（ルート `.env` では `GITHUB_PAT` から Compose が注入） |
-| `postgres` | 接続文字列はファイル内。本番では環境変数化を推奨 |
+| `postgres` | envmcp 経由で DATABASE_URL から生成 |
 | `filesystem` | マウントパスは `args` で指定 |
 | `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
 | `notion_snapshots` | ローカルスナップショット（`./wiki/notion`） |

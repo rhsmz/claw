@@ -3,16 +3,21 @@
       "search": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-        "env": { "BRAVE_SEARCH_API_KEY": "" }
       },
       "github": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-github"],
-        "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "" }
       },
       "postgres": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:pass@postgres:5432/db"]
+        "args": [
+          "-y",
+          "envmcp",
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-postgres",
+          "$DATABASE_URL"
+        ]
       },
       "filesystem": {
         "command": "npx",
@@ -60,7 +65,6 @@
       "context7": {
         "command": "npx",
         "args": ["-y", "@context7/mcp-server"],
-        "env": { "CONTEXT7_API_KEY": "" }
       },
       "notion_snapshots": {
         "command": "npx",

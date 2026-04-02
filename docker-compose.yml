@@ -125,6 +125,8 @@ services:
       PGDATABASE: ${ZEROCLAW_DB_NAME}
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
+      # @modelcontextprotocol/server-postgres は接続文字列を CLI 引数で要求するため、envmcp 経由で DATABASE_URL から生成
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
       OLLAMA_HOST: http://ollama:11434
 
   zeroclaw:
