@@ -85,9 +85,16 @@ services:
       - "--port"
       - "4000"
     # /health は Bearer 必須かつ全モデルへ実リクエストのためプローブに不向き。
-    # 公式: /health/readiness は未認証で DB・キャッシュ接続を確認（compose の healthy に適する）
+    # 公式: /health/readiness は未認証で DB・キャッシュ接続を確認。
+    # 公式イメージ（Wolfi）に curl が無いため python で HTTP 200 を確認する。
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:4000/health/readiness >/dev/null || exit 1"]
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=8)",
+        ]
       interval: 15s
       timeout: 10s
       retries: 8
