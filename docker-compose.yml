@@ -162,8 +162,13 @@ services:
     init: true
     environment:
       ZEROCLAW_ALLOW_PUBLIC_BIND: "true"
+      ZEROCLAW_GATEWAY_HOST: "0.0.0.0"
       ZEROCLAW_GATEWAY_PORT: "42617"
+      # 既定プロバイダが openrouter のままだと sk- の API_KEY と整合せず起動失敗する
+      ZEROCLAW_PROVIDER: openai
+      ZEROCLAW_MODEL: ${DEFAULT_MODEL}
       API_KEY: ${LITELLM_MASTER_KEY}
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

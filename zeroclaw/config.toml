@@ -1,6 +1,10 @@
 # =============================================================================
 # ZeroClaw Enterprise Configuration - The Sovereign 64
 # =============================================================================
+#
+# latest イメージは [llm] / [server] / [[crews]] を無視する。プロバイダ・ベース URL はルートキーまたは環境変数を使う。
+default_provider = "openai"
+api_url = "http://litellm:4000/v1"
 
 [server]
 port = 42617
