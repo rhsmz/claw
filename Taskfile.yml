@@ -1,11 +1,15 @@
 version: '3'
 
+# ルートの .env を Task から参照（存在しない場合は無視されない環境もあるため、先に task setup を推奨）
+dotenv: ['.env']
+
 # =============================================================================
 # 帝国全軍指揮用変数 (Global Variables)
 # =============================================================================
 vars:
   PROJECT_NAME: zeroclaw-enterprise
-  DOCKER_COMPOSE: docker-compose -p {{.PROJECT_NAME}}
+  # Compose V2: docker-compose.yml の top-level `name:` がプロジェクト名になる
+  DOCKER_COMPOSE: docker compose
   # config.toml に基づく既定ポート
   API_PORT: 42617 
   # バニラ状態の標準モデル
@@ -43,10 +47,21 @@ tasks:
   # 2. 進軍・戦線展開 (Infrastructure Control)
   # ---------------------------------------------------------------------------
   up:
-    desc: 帝国全軍を召喚し、戦線を展開（Docker起動）
+    desc: コアスタックを起動（Postgres / Redis / Ollama / LiteLLM / MCP Gateway）
     cmds:
-      - "{{.DOCKER_COMPOSE}} up -d --build"
+      - "{{.DOCKER_COMPOSE}} up -d"
       - task: status
+
+  up-with-zeroclaw:
+    desc: ZeroClaw コンテナも起動（--profile zeroclaw。OSS イメージと config の互換は要確認）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} --profile zeroclaw up -d"
+      - task: status
+
+  compose-validate:
+    desc: docker compose 定義の検証（環境変数展開と YAML）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} config --quiet"
 
   down:
     desc: 戦線を縮小し、全軍を帰還させる（コンテナ停止）
@@ -59,7 +74,12 @@ tasks:
       - "{{.DOCKER_COMPOSE}} ps"
 
   logs:
-    desc: 64名のエージェントの思考ログを監視
+    desc: コアサービス（litellm / ollama / postgres）のログを追跡
+    cmds:
+      - "{{.DOCKER_COMPOSE}} logs -f litellm ollama postgres"
+
+  logs-zeroclaw:
+    desc: ZeroClaw コンテナのログ（--profile zeroclaw で起動した場合）
     cmds:
       - "{{.DOCKER_COMPOSE}} logs -f zeroclaw"
 
@@ -69,7 +89,7 @@ tasks:
   ollama-pull:
     desc: バニラ推論モデル (gemma3:12b) を取得
     cmds:
-      - docker compose exec ollama ollama pull {{.VANILLA_MODEL}}
+      - "{{.DOCKER_COMPOSE}} exec ollama ollama pull {{.VANILLA_MODEL}}"
 
   polyglot-build:
     desc: 多言語実行サンドボックス (JS/PHP/Go/Rust) を再構築
@@ -80,7 +100,7 @@ tasks:
   mcp-sync:
     desc: 39の神器（MCPサーバー）を再同期
     cmds:
-      - docker restart mcp-gateway
+      - "{{.DOCKER_COMPOSE}} restart mcp-gateway"
       - echo "全ツールが再接続されました。"
 
   # ---------------------------------------------------------------------------
@@ -108,17 +128,17 @@ tasks:
   # 5. 帝国統治 (Rust Management & Audit)
   # ---------------------------------------------------------------------------
   sync:
-    desc: [Rust] 過去の資産やWikiを知識基盤 (Context7) へ同期
+    desc: "[Rust] 過去の資産やWikiを知識基盤 (Context7) へ同期"
     cmds:
       - cargo run --manifest-path {{.MGMT_PATH}}/Cargo.toml -- sync
 
   audit:
-    desc: [Rust] 全クルーの監査ログをスキャンし、セキュリティ事案を検知
+    desc: "[Rust] 全クルーの監査ログをスキャンし、セキュリティ事案を検知"
     cmds:
       - cargo run --manifest-path {{.MGMT_PATH}}/Cargo.toml -- audit
 
   check:
-    desc: [Rust] 帝国のインフラ（Ollama/LiteLLM/DB）の生存確認
+    desc: "[Rust] 帝国のインフラ（Ollama/LiteLLM/DB）の生存確認"
     cmds:
       - cargo run --manifest-path {{.MGMT_PATH}}/Cargo.toml -- status
 

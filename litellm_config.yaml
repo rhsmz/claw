@@ -28,6 +28,13 @@ model_list:
       api_base: http://ollama:11434
       timeout: 120
 
+  # .env の DEFAULT_MODEL（例: gemma3:12b）と zeroclaw/config.toml の model を一致させる
+  - model_name: gemma3:12b
+    litellm_params:
+      model: ollama/gemma3:12b
+      api_base: http://ollama:11434
+      timeout: 300
+
   # ---------------------------------------------------------------------------
   # 2. 追加設定: クラウドLLM (必要に応じてコメントアウトを解除して有効化)
   # ---------------------------------------------------------------------------
@@ -58,13 +65,11 @@ model_list:
 
 router_settings:
   # 負荷ベースのルーティング。複数のOllamaインスタンスがある場合に有効。
-  routing_strategy: usage-based-routing-v2 
-  
-  # ローカルモデルがタイムアウトしたりエラーを吐いた際の救済策。
-  enable_fallbacks: true
-  context_window_fallbacks:
-    - [.*, openai/gpt-4o] # コンテキスト溢れ時はクラウドへ逃がす設定例
-  
+  routing_strategy: usage-based-routing-v2
+
+  # ローカル only で起動する場合は false（OPENAI_API_KEY 未設定時のフォールバック失敗を防ぐ）
+  enable_fallbacks: false
+
   # エラー発生時の自動リトライ設定
   num_retries: 3
   retry_after: 5
@@ -86,13 +91,13 @@ litellm_settings:
   # 推論結果をキャッシュして応答を高速化し、トークンを節約。
   cache: true
   cache_type: redis
-  
+
   # 未知のパラメータが送られてきてもエラーにせず無視する。
   drop_params: true
-  
-  # 可観測性ツール（Langfuse）との連携設定
-  success_callback: ["langfuse"]
-  failure_callback: ["langfuse"]
+
+  # Langfuse を compose に含めない既定スタックではコールバックを空にする
+  success_callback: []
+  failure_callback: []
 
 # =============================================================================
 # 監査・セキュリティ設定

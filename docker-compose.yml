@@ -1,67 +1,142 @@
+# Compose V2 形式（version キーは不要）。
+# 既定: Postgres / Redis / Ollama / LiteLLM / MCP Gateway
+# ZeroClaw: docker compose --profile zeroclaw up -d
+# 参考: https://docs.docker.com/compose/ / ZeroClaw deployment（公式イメージ・設定マウント）
+
+name: zeroclaw-enterprise
+
 services:
-  # データベース: Context7 (RAG) とエージェントの記憶用
   postgres:
     image: ankane/pgvector:latest
+    restart: unless-stopped
+    init: true
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${ZEROCLAW_DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${ZEROCLAW_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # 高速キャッシュ: バックエンド部隊の検証用
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    init: true
     command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  # LLMプロキシ: コスト管理・リトライ・冗長化の要
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    init: true
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     volumes:
-      - ./litellm/config.yaml:/app/config.yaml
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    ports:
+      - "4000:4000"
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
-    ports:
-      - "4000:4000"
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+    command:
+      - "--config"
+      - "/app/config.yaml"
+      - "--port"
+      - "4000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:4000/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # MCP Gateway: 39のスキル（神器）を統合するハブ
   mcp-gateway:
     image: mcp/gateway:latest
-    volumes:
-      - ./mcp/config.json:/app/config.json
-      - ./mcp/vault:/app/vault:ro # 機密情報
-    environment:
-      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY}
-      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PAT}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
-
-  # ZeroClaw Server: 帝国の本体
-  zeroclaw:
-    build: .
+    ports:
+      - "8811:8811"
     volumes:
-      - ./config.toml:/app/config.toml
-      - ./prompts:/app/prompts
-      - ./skills:/app/skills
+      - ./mcp/config.json:/app/config.json:ro
+      - ./mcp/vault:/app/vault:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+  zeroclaw:
+    profiles: ["zeroclaw"]
+    image: ghcr.io/zeroclaw-labs/zeroclaw:latest
+    restart: unless-stopped
+    init: true
+    environment:
+      ZEROCLAW_ALLOW_PUBLIC_BIND: "true"
+      ZEROCLAW_GATEWAY_PORT: "42617"
+      API_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ZEROCLAW_DB_NAME: ${ZEROCLAW_DB_NAME}
+      DEFAULT_MODEL: ${DEFAULT_MODEL}
+    volumes:
+      # 公式デプロイ例: 設定は ~/.zeroclaw 相当へマウント
+      - zeroclaw_data:/zeroclaw-data
+      - ./zeroclaw/config.toml:/zeroclaw-data/.zeroclaw/config.toml:ro
+      - ./prompts:/zeroclaw-data/prompts:ro
     ports:
       - "42617:42617"
     depends_on:
-      - mcp-gateway
-      - litellm
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      mcp-gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "zeroclaw", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
+  ollama_data:
+  zeroclaw_data:
