@@ -116,6 +116,8 @@ services:
       - --config=/app/config.json
       # Linux/WSL では Docker Desktop のシークレット API が無い。リポジトリ同梱のテンプレを参照
       - --secrets=/app/gateway-secrets.env
+      # v2: カタログ上のサーバ名を列挙しないと serverNames が空で「No server is enabled」になる（mcpServers JSON だけでは有効化されない）
+      - --servers=duckduckgo
     ports:
       - "8811:8811"
     volumes:
@@ -140,6 +142,8 @@ services:
       - ./wiki:/app/wiki:ro
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      # Docker CE / WSL 等で Desktop の MCP 機能検査を避ける（公式 README 推奨）
+      DOCKER_MCP_IN_CONTAINER: "1"
       BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}

@@ -9,10 +9,10 @@
 | レイヤー | ファイル | 役割 |
 |----------|----------|------|
 | **スキル → MCP サーバ ID** | `zeroclaw/config.toml` の `[[skills]]` | 各 `name`（スキル）に `mcp_server = "..."` が対応。**エージェントがどのサーバ名を要求するか**の正はここです。現状 **40** スキルが定義されています。 |
-| **ゲートウェイが起動するサーバ** | `mcp/config.json` の `mcpServers` の **キー** | Docker MCP Gateway が実際に立ち上げるプロセス定義。キー名がツール一覧に出る名前と対応します。 |
+| **ゲートウェイが起動するサーバ** | `docker-compose.yml` の `mcp-gateway` の **`--servers`**（Docker MCP カタログ上の名前）が **有効化の正**。`mcp/config.json` の `mcpServers` は追加設定・クライアント互換用で、**v2 では `--servers` を付けないと「No server is enabled」のまま**カタログ由来のツールは載りません。 |
 | **シークレット・接続文字列** | ルート `.env`（Compose 補間）および `mcp/gateway.env`（運用テンプレート） | 変数の意味と Compose との関係は [ENV.md](../ENV.md) を参照。 |
 
-**整合の取り方**: `config.toml` の `mcp_server` と、`config.json` のトップレベルキーは **一致している必要**があります（サンプルでは `search` / `mermaid` に寄せています）。
+**整合の取り方**: スキルが期待する ID（例: `duckduckgo`）を **`--servers` にカタログ名として含める**必要があります。`config.json` のキー（例: `search` = Brave）は Cursor 向け stdio 定義であり、カタログ名と **同一とは限りません**。追加のカタログサーバは `docker mcp catalog` / 公式ドキュメントで名前を確認し、compose の `--servers` を増やしてください。
 
 ---
 
