@@ -22,7 +22,7 @@
 
 | カテゴリ | スキル名 (`name`) | `mcp_server` |
 |----------|-------------------|--------------|
-| 知能・基盤 | `knowledge_base` | `context7` |
+| 知能・基盤 | `knowledge_base` | `filesystem` |
 | | `logical_reasoning` | `sequential-thinking` |
 | | `time_management` | `time` |
 | 調査・諜報 | `market_research` | `brave-search` |
@@ -30,7 +30,7 @@
 | | `web_search` | `duckduckgo` |
 | | `knowledge_base_lookup` | `wikipedia` |
 | 開発基盤 | `filesystem` | `filesystem` |
-| | `github_api` | `github` |
+| | `github_api` | `git` |
 | | `code_interpreter` | `python-shell` |
 | | `api_testing` | `curl-executor` |
 | | `api_spec_manager` | `openapi-spec-tool` |
@@ -75,6 +75,7 @@
 | `github` | `GITHUB_PERSONAL_ACCESS_TOKEN`（ルート `.env` では `GITHUB_PAT` から Compose が注入） |
 | `postgres` | 接続文字列はファイル内。本番では環境変数化を推奨 |
 | `filesystem` | マウントパスは `args` で指定 |
+| `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
 | `sequential-thinking` | |
 | `node-runtime` | ホストの `docker.sock` をゲートウェイから利用 |
 | `polyglot-sandbox` | カスタムイメージ `imperial-polyglot-runner:latest` |

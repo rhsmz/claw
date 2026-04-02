@@ -94,6 +94,20 @@ services:
     volumes:
       - ./mcp/config.json:/app/config.json:ro
       - ./mcp/vault:/app/vault:ro
+      # filesystem / git ローカル代替が参照するワークスペース
+      # 依存削減のため external サービスではなく、こちらを読みます。
+      - ./prompts:/app/workspace/prompts:ro
+      - ./zeroclaw:/app/workspace/zeroclaw:ro
+      - ./scripts:/app/workspace/scripts:ro
+      - ./mcp:/app/workspace/mcp:ro
+      - ./postgres-init:/app/workspace/postgres-init:ro
+      - ./.git:/app/workspace/.git:ro
+      - ./README.md:/app/workspace/README.md:ro
+      - ./ENV.md:/app/workspace/ENV.md:ro
+      - ./Taskfile.yml:/app/workspace/Taskfile.yml:ro
+      - ./docker-compose.yml:/app/workspace/docker-compose.yml:ro
+      - ./litellm_config.yaml:/app/workspace/litellm_config.yaml:ro
+      - ./.env.example:/app/workspace/.env.example:ro
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}

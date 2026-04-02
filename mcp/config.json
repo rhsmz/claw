@@ -18,6 +18,17 @@
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/workspace"]
       },
+      "git": {
+        "command": "docker",
+        "args": [
+          "run",
+          "--rm",
+          "-i",
+          "--mount",
+          "type=bind,src=/app/workspace,dst=/app/workspace,ro",
+          "mcp/git"
+        ]
+      },
       "sequential-thinking": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]

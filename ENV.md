@@ -80,13 +80,14 @@ Windows（cmd）の例: `copy .env.example .env`
 
 | MCP サーバ ID（`config.toml`） | 主な環境変数・備考 |
 |-------------------------------|-------------------|
-| `context7` | `CONTEXT7_API_KEY` |
+| `context7` | `CONTEXT7_API_KEY`（knowledge_base はデフォルトで `filesystem` を使用。context7 はオプション） |
 | `sequential-thinking` | 通常はキー不要 |
 | `time` | **現状 `mcp/config.json` に未定義**。ゲートウェイへサーバ追加が必要 |
 | `brave-search` | `BRAVE_SEARCH_API_KEY`（サンプル `config.json` ではキー名 `search` — 名前の整合は [mcp/README.md](mcp/README.md) 参照） |
 | `arxiv` / `duckduckgo` / `wikipedia` | 多くはキー不要（レート制限対策で任意 ID 等） |
 | `filesystem` | パスは `mcp/config.json` の `args` で指定 |
-| `github` | `GITHUB_PAT`（Compose 経由）または `GITHUB_PERSONAL_ACCESS_TOKEN` |
+| `git` | ローカル git 参照（workspace の bind mount 前提。外部 GitHub はオプション） |
+| `github` | `GITHUB_PAT`（Compose 経由）または `GITHUB_PERSONAL_ACCESS_TOKEN`（外部版。必要時のみ） |
 | `python-shell` / `curl-executor` / `openapi-spec-tool` 等 | カタログに応じた追加定義が必要な場合あり |
 | `node-runtime` / `polyglot-sandbox` 等 | Docker ソケット利用。イメージ・ボリュームは `mcp/config.json` で調整 |
 | `postgres` | 接続文字列は `config.json` 内（本番ではシークレット化を推奨） |
