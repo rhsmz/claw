@@ -14,7 +14,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${ZEROCLAW_DB_NAME}
-      # 01-init-databases.sql が参照するため postgres コンテナ側にも渡す
       ZEROCLAW_DB_NAME: ${ZEROCLAW_DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -26,7 +25,9 @@ services:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" || exit 1"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      # 初回 init（複数 DB / 拡張）が長引く環境向け
+      start_period: 60s
 
   redis:
     image: redis:7-alpine
