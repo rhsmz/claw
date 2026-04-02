@@ -7,10 +7,17 @@ port = 42617
 log_level = "info"
 audit_log = true # 全操作の監査ログを記録
 
-[storage]
+# メモリ永続化: 現行スキーマは [memory].backend + [storage.provider.config]（provider はネストした struct）
+[memory]
+backend = "postgres"
+auto_save = true
+
+[storage.provider.config]
 provider = "postgres"
-url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}"
-max_connections = 350 # 64名のエージェントと並列解析プロセスを支える
+db_url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}"
+schema = "public"
+table = "memories"
+connect_timeout_secs = 15
 
 [llm]
 provider = "openai"
