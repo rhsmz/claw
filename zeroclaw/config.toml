@@ -536,7 +536,7 @@ mcp_server = "time"
 
 [[skills]]
 name = "market_research"
-mcp_server = "brave-search"
+mcp_server = "search"
 
 [[skills]]
 name = "academic_research"
@@ -620,7 +620,7 @@ mcp_server = "redis"
 
 [[skills]]
 name = "diagram_generation"
-mcp_server = "mermaid-renderer"
+mcp_server = "mermaid"
 
 [[skills]]
 name = "doc_parsing"

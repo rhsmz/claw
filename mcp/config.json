@@ -33,6 +33,18 @@
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
       },
+      "time": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-time"]
+      },
+      "arxiv": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-arxiv"]
+      },
+      "duckduckgo": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-duckduckgo"]
+      },
       "node-runtime": {
         "command": "docker",
         "args": ["run", "-i", "--rm", "node:20-alpine", "node"]

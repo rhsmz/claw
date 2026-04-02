@@ -12,7 +12,7 @@
 | **ゲートウェイが起動するサーバ** | `mcp/config.json` の `mcpServers` の **キー** | Docker MCP Gateway が実際に立ち上げるプロセス定義。キー名がツール一覧に出る名前と対応します。 |
 | **シークレット・接続文字列** | ルート `.env`（Compose 補間）および `mcp/gateway.env`（運用テンプレート） | 変数の意味と Compose との関係は [ENV.md](../ENV.md) を参照。 |
 
-**整合の取り方**: `config.toml` の `mcp_server` と、`config.json` のトップレベルキーは **一致している必要**があります。サンプルの `config.json` では Brave 検索がキー **`search`** になっており、`config.toml` の **`brave-search`** と異なります。運用ではどちらかに揃えるか、ゲートウェイの仕様に合わせてリネームしてください。同様に、ダイアグラム用は `config.toml` が **`mermaid-renderer`**、`config.json` サンプルは **`mermaid`** です。
+**整合の取り方**: `config.toml` の `mcp_server` と、`config.json` のトップレベルキーは **一致している必要**があります（サンプルでは `search` / `mermaid` に寄せています）。
 
 ---
 
@@ -25,7 +25,7 @@
 | 知能・基盤 | `knowledge_base` | `hexa_rag` |
 | | `logical_reasoning` | `sequential-thinking` |
 | | `time_management` | `time` |
-| 調査・諜報 | `market_research` | `brave-search` |
+| 調査・諜報 | `market_research` | `search` |
 | | `academic_research` | `arxiv` |
 | | `web_search` | `duckduckgo` |
 | | `knowledge_base_lookup` | `hexa_rag` |
@@ -46,7 +46,7 @@
 | | `linter_rust` | `clippy-analyzer` |
 | データ・構造 | `db_operation` | `postgres` |
 | | `cache_design` | `redis` |
-| | `diagram_generation` | `mermaid-renderer` |
+| | `diagram_generation` | `mermaid` |
 | ドキュメント・法務 | `doc_parsing` | `pdf-parser` |
 | | `legal_research` | `legal-database-api` |
 | | `ip_search` | `trademark-patent-search` |
@@ -67,26 +67,29 @@
 
 ## 3. 現行 `mcp/config.json` に含まれるサーバキー
 
-リポジトリに同梱されているサンプルでは、次の **13** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
+リポジトリに同梱されているサンプルでは、次の **17** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
 
 | `config.json` のキー | 備考 |
 |----------------------|------|
-| `search` | Brave Search（`mcp_server` 名 `brave-search` との整合要確認） |
+| `search` | Brave Search |
 | `github` | `GITHUB_PERSONAL_ACCESS_TOKEN`（ルート `.env` では `GITHUB_PAT` から Compose が注入） |
 | `postgres` | 接続文字列はファイル内。本番では環境変数化を推奨 |
 | `filesystem` | マウントパスは `args` で指定 |
 | `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
 | `notion_snapshots` | ローカルスナップショット（`./wiki/notion`） |
 | `sequential-thinking` | |
+| `time` | |
+| `arxiv` | |
+| `duckduckgo` | |
 | `hexa_rag` | ローカル RAG（Markdown -> pgvector） |
 | `node-runtime` | ホストの `docker.sock` をゲートウェイから利用 |
 | `polyglot-sandbox` | カスタムイメージ `imperial-polyglot-runner:latest` |
 | `sentry` | |
 | `context7` | `CONTEXT7_API_KEY` |
 | `confluence_snapshots` | ローカルスナップショット（`./wiki/confluence`） |
-| `mermaid` | `mcp_server` 名 `mermaid-renderer` との整合要確認 |
+| `mermaid` | |
 
-未登録の例: `time`, `arxiv`, `duckduckgo`, `wikipedia`, `python-shell`, `redis`, `aws`, `kubernetes` など。必要なサーバは [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) や各パッケージの README を参照し、`config.json` に追記してください。
+未登録の例: `wikipedia`, `python-shell`, `redis`, `aws`, `kubernetes` など。必要なサーバは [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) や各パッケージの README を参照し、`config.json` に追記してください。
 
 ---
 
