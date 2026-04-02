@@ -207,7 +207,7 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 | **ドキュメント・法務** | `pdf-parser`, `legal-database-api`, `trademark-patent-search`, `web-scraper` | PDF、法務 DB、商標・特許、ガイドライン取得（契約・実装は別途） |
 | **品質・監視** | `sentry`, `browserbase`, `snyk`, `hashicorp-vault-mcp` | エラー監視、ブラウザ自動化、脆弱性、Vault |
 | **インフラ** | `aws`, `docker-mcp`, `kubernetes` | AWS、Docker、Kubernetes（資格情報は [ENV.md](ENV.md)） |
-| **連携・共有** | `discord`, `slack`, `notion`, `confluence` | 通知・Wiki・Confluence（トークンは `.env` / `mcp/gateway.env`、漏洩に注意） |
+| **連携・共有** | `discord`, `slack`, `notion_snapshots`, `confluence_snapshots` | 通知・Wiki・Confluence（Notion/Confluence はローカルスナップショットでオフライン運用） |
 
 ### シークレットと Compose
 

@@ -50,37 +50,13 @@
         "args": ["-y", "@context7/mcp-server"],
         "env": { "CONTEXT7_API_KEY": "" }
       },
-      "notion": {
-        "command": "docker",
-        "args": [
-          "run",
-          "-i",
-          "--rm",
-          "-e",
-          "INTERNAL_INTEGRATION_TOKEN",
-          "mcp/notion"
-        ]
+      "notion_snapshots": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/wiki/notion"]
       },
-      "confluence": {
-        "command": "docker",
-        "args": [
-          "run",
-          "--rm",
-          "-i",
-          "-e",
-          "atlassian.url",
-          "-e",
-          "atlassian.username",
-          "-e",
-          "atlassian.pat",
-          "-e",
-          "quarkus.mcp.server.stdio.enabled=true",
-          "-e",
-          "quarkus.log.console.enable=false",
-          "-e",
-          "quarkus.log.console.stderr=false",
-          "guang1/confluence-mcp:latest"
-        ]
+      "confluence_snapshots": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/wiki/confluence"]
       },
       "mermaid": {
         "command": "npx",

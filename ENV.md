@@ -46,8 +46,8 @@ Windows（cmd）の例: `copy .env.example .env`
 | クラウド / K8s | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` | AWS（`mcp-gateway` にも渡す） |
 | | `KUBECONFIG_PATH` | kubeconfig の参照パス（運用に合わせて） |
 | 連携 | `DISCORD_WEBHOOK_URL` / `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` | 通知 |
-| | `NOTION_API_KEY` / `NOTION_DATABASE_ID` | Notion |
-| | `CONFLUENCE_API_TOKEN` / `CONFLUENCE_EMAIL` / `CONFLUENCE_URL` | Confluence |
+| | `NOTION_API_KEY` / `NOTION_DATABASE_ID` | Notion（任意: 一度ローカルへ export する場合） |
+| | `CONFLUENCE_API_TOKEN` / `CONFLUENCE_EMAIL` / `CONFLUENCE_URL` | Confluence（任意: 一度ローカルへ export する場合） |
 | 多言語サンドボックス | `COMPOSER_AUTH` / `CARGO_HOME` / `GOPATH` / `NODE_ENV` | ビルド・実行環境 |
 
 **GitHub トークン名の対応**: `mcp/config.json` や `mcp/gateway.env.example` では `GITHUB_PERSONAL_ACCESS_TOKEN` という名前が使われます。ルート `.env` では **`GITHUB_PAT`** を設定し、Compose が MCP Gateway コンテナ内では `GITHUB_PERSONAL_ACCESS_TOKEN` として渡します。`mcp/gateway.env` に直接書く場合は **`GITHUB_PERSONAL_ACCESS_TOKEN`** で統一してください。

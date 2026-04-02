@@ -60,8 +60,8 @@
 | | `container_orchestration` | `kubernetes` |
 | 連携・共有 | `team_notify_discord` | `discord` |
 | | `team_notify_slack` | `slack` |
-| | `wiki_management` | `notion` |
-| | `enterprise_docs` | `confluence` |
+| | `wiki_management` | `notion_snapshots` |
+| | `enterprise_docs` | `confluence_snapshots` |
 
 ---
 
@@ -76,13 +76,13 @@
 | `postgres` | 接続文字列はファイル内。本番では環境変数化を推奨 |
 | `filesystem` | マウントパスは `args` で指定 |
 | `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
-| `notion` | Docker 経由 `mcp/notion`（`INTERNAL_INTEGRATION_TOKEN` が必要） |
+| `notion_snapshots` | ローカルスナップショット（`./wiki/notion`） |
 | `sequential-thinking` | |
 | `node-runtime` | ホストの `docker.sock` をゲートウェイから利用 |
 | `polyglot-sandbox` | カスタムイメージ `imperial-polyglot-runner:latest` |
 | `sentry` | |
 | `context7` | `CONTEXT7_API_KEY` |
-| `confluence` | Docker 経由 `guang1/confluence-mcp:latest`（Atlassian 用の env が必要） |
+| `confluence_snapshots` | ローカルスナップショット（`./wiki/confluence`） |
 | `mermaid` | `mcp_server` 名 `mermaid-renderer` との整合要確認 |
 
 未登録の例: `time`, `arxiv`, `duckduckgo`, `wikipedia`, `python-shell`, `redis`, `aws`, `kubernetes` など。必要なサーバは [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) や各パッケージの README を参照し、`config.json` に追記してください。

@@ -676,8 +676,8 @@ mcp_server = "slack"
 
 [[skills]]
 name = "wiki_management"
-mcp_server = "notion"
+mcp_server = "notion_snapshots"
 
 [[skills]]
 name = "enterprise_docs"
-mcp_server = "confluence"
+mcp_server = "confluence_snapshots"
