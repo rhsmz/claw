@@ -84,9 +84,10 @@ services:
       - "/app/config.yaml"
       - "--port"
       - "4000"
-    # 初回・DB 共有時は P3005→baseline→多数マイグレーションで数分かかり、この間 /health は応答しない
+    # /health は Bearer 必須かつ全モデルへ実リクエストのためプローブに不向き。
+    # 公式: /health/readiness は未認証で DB・キャッシュ接続を確認（compose の healthy に適する）
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:4000/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:4000/health/readiness >/dev/null || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 8
