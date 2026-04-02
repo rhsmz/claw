@@ -211,7 +211,7 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
   - **MCP のサーバ名が合わない** `zeroclaw/config.toml` の各スキルの `mcp_server` と、`mcp/config.json` のキー名が一致している必要があります（例: 調査系は `search`）。起動失敗やツールが出ない場合は [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) または `docker mcp` CLI で実名を確認し、`config.json` を修正してください。
 
-  - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 11434 / ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。競合プロセスを止めるか、`docker-compose.yml` の `ports` を変更します（変更後は README の URL も読み替え）。
+  - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 11434 / ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。**PostgreSQL** は `.env` の **`POSTGRES_HOST_PORT`**（既定 `5432`）でホスト側ポートを変えられます（例: `5433`。コンテナ同士の接続は引き続き `postgres:5432`）。その他は競合プロセスを止めるか、`docker-compose.yml` の `ports` を変更します。
 
   - **推論が 404 / model not found** `DEFAULT_MODEL`・`litellm_config.yaml` の `model_name`・Ollama 内の `ollama list` の三者が一致しているか確認してください。
 
