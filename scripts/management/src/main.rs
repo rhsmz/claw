@@ -20,11 +20,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// 指定ディレクトリの Markdown を読み取り、documents テーブルへ格納（任意で Ollama 埋め込み）
+    /// 指定ディレクトリの Markdown を読み取り、documents テーブルへ格納（任意で LiteLLM /v1/embeddings）
     Sync,
     /// audit_logs を走査し、機密らしい出力を検知
     Audit,
-    /// Ollama / LiteLLM / PostgreSQL の生存確認
+    /// rust-inference / LiteLLM / PostgreSQL の生存確認
     Status,
 }
 
@@ -82,28 +82,48 @@ const MAX_FILES_PER_SYNC: usize = 500;
 const EMBED_INPUT_CHARS: usize = 16_384;
 
 #[derive(Deserialize)]
-struct OllamaEmbedResponse {
+struct OpenAiEmbedItem {
     embedding: Vec<f32>,
 }
 
-async fn fetch_ollama_embedding(client: &reqwest::Client, base: &str, model: &str, text: &str) -> Option<serde_json::Value> {
-    let prompt: String = text.chars().take(EMBED_INPUT_CHARS).collect();
-    let url = format!("{}/api/embeddings", base.trim_end_matches('/'));
-    let body = serde_json::json!({ "model": model, "prompt": prompt });
-    let res = client.post(&url).json(&body).send().await.ok()?;
+#[derive(Deserialize)]
+struct OpenAiEmbedResponse {
+    data: Vec<OpenAiEmbedItem>,
+}
+
+/// LiteLLM（OpenAI 互換 `/v1/embeddings`）経由。`LITELLM_MASTER_KEY` を Authorization に使う。
+async fn fetch_litellm_embedding(
+    client: &reqwest::Client,
+    base: &str,
+    api_key: &str,
+    model: &str,
+    text: &str,
+) -> Option<serde_json::Value> {
+    let input: String = text.chars().take(EMBED_INPUT_CHARS).collect();
+    let url = format!("{}/v1/embeddings", base.trim_end_matches('/'));
+    let body = serde_json::json!({ "model": model, "input": input });
+    let res = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .json(&body)
+        .send()
+        .await
+        .ok()?;
     if !res.status().is_success() {
-        warn!(status = %res.status(), "Ollama 埋め込み API がエラーを返しました");
+        warn!(status = %res.status(), "LiteLLM 埋め込み API がエラーを返しました");
         return None;
     }
-    let parsed: OllamaEmbedResponse = res.json().await.ok()?;
-    serde_json::to_value(parsed.embedding).ok()
+    let parsed: OpenAiEmbedResponse = res.json().await.ok()?;
+    let emb = parsed.data.first()?.embedding.clone();
+    serde_json::to_value(emb).ok()
 }
 
 async fn sync_knowledge_base(pool: &sqlx::PgPool) -> Result<()> {
     info!("知識同期: documents テーブルへ取り込みを開始します");
 
-    let ollama_base = http_base("IMPERIAL_OLLAMA_URL", "http://127.0.0.1:11434");
-    let embed_model = env::var("IMPERIAL_OLLAMA_EMBED_MODEL").unwrap_or_else(|_| "nomic-embed-text".into());
+    let litellm_base = http_base("IMPERIAL_LITELLM_URL", "http://127.0.0.1:4000");
+    let embed_model = env::var("IMPERIAL_EMBEDDING_MODEL").unwrap_or_default();
+    let api_key = env::var("LITELLM_MASTER_KEY").unwrap_or_default();
     let dirs_raw = env::var("IMPERIAL_KNOWLEDGE_DIRS").unwrap_or_default();
     let dirs: Vec<String> = dirs_raw
         .split(',')
@@ -118,8 +138,18 @@ async fn sync_knowledge_base(pool: &sqlx::PgPool) -> Result<()> {
 
     if dirs.is_empty() {
         info!("IMPERIAL_KNOWLEDGE_DIRS が空です。接続確認用のプレースホルダ 1 件を書き込みます（カンマ区切りでディレクトリを指定可能）");
-        let emb = fetch_ollama_embedding(&client, &ollama_base, &embed_model, "placeholder sync ping")
-            .await;
+        let emb = if embed_model.is_empty() || api_key.is_empty() {
+            None
+        } else {
+            fetch_litellm_embedding(
+                &client,
+                &litellm_base,
+                &api_key,
+                &embed_model,
+                "placeholder sync ping",
+            )
+            .await
+        };
         sqlx::query(
             r#"INSERT INTO documents (content, source_path, embedding)
                VALUES ($1, $2, $3)
@@ -167,7 +197,11 @@ async fn sync_knowledge_base(pool: &sqlx::PgPool) -> Result<()> {
             }
             let content = std::fs::read_to_string(path).with_context(|| format!("読み込み: {}", path.display()))?;
             let rel = path.to_string_lossy().to_string();
-            let emb = fetch_ollama_embedding(&client, &ollama_base, &embed_model, &content).await;
+            let emb = if embed_model.is_empty() || api_key.is_empty() {
+                None
+            } else {
+                fetch_litellm_embedding(&client, &litellm_base, &api_key, &embed_model, &content).await
+            };
 
             sqlx::query(
                 r#"INSERT INTO documents (content, source_path, embedding)
@@ -243,7 +277,7 @@ async fn run_security_audit(pool: &sqlx::PgPool) -> Result<()> {
 async fn check_imperial_status(pool: &sqlx::PgPool) -> Result<()> {
     info!("コンポーネント生存確認を実行します");
 
-    let ollama_base = http_base("IMPERIAL_OLLAMA_URL", "http://127.0.0.1:11434");
+    let rust_base = http_base("IMPERIAL_RUST_INFERENCE_URL", "http://127.0.0.1:9080");
     let litellm_base = http_base("IMPERIAL_LITELLM_URL", "http://127.0.0.1:4000");
 
     let client = reqwest::Client::builder()
@@ -253,29 +287,29 @@ async fn check_imperial_status(pool: &sqlx::PgPool) -> Result<()> {
 
     let mut any_fail = false;
 
-    let url = format!("{}/api/tags", ollama_base.trim_end_matches('/'));
-    match client.get(&url).send().await {
-        Ok(r) if r.status().is_success() => info!("Ollama: 応答あり ({})", url),
+    let ri_health = format!("{}/health", rust_base.trim_end_matches('/'));
+    match client.get(&ri_health).send().await {
+        Ok(r) if r.status().is_success() => info!("rust-inference: 応答あり ({})", ri_health),
         Ok(r) => {
             any_fail = true;
-            error!(status = %r.status(), "Ollama: 異常ステータス ({})", url);
+            error!(status = %r.status(), "rust-inference: 異常ステータス ({})", ri_health);
         }
         Err(e) => {
             any_fail = true;
-            error!(error = %e, "Ollama: 接続失敗 ({})", url);
+            error!(error = %e, "rust-inference: 接続失敗 ({})", ri_health);
         }
     }
 
-    let health = format!("{}/health", litellm_base.trim_end_matches('/'));
-    match client.get(&health).send().await {
-        Ok(r) if r.status().is_success() => info!("LiteLLM: 応答あり ({})", health),
+    let ll_ready = format!("{}/health/liveness", litellm_base.trim_end_matches('/'));
+    match client.get(&ll_ready).send().await {
+        Ok(r) if r.status().is_success() => info!("LiteLLM: 応答あり ({})", ll_ready),
         Ok(r) => {
             any_fail = true;
-            error!(status = %r.status(), "LiteLLM: 異常ステータス ({})", health);
+            error!(status = %r.status(), "LiteLLM: 異常ステータス ({})", ll_ready);
         }
         Err(e) => {
             any_fail = true;
-            error!(error = %e, "LiteLLM: 接続失敗 ({})", health);
+            error!(error = %e, "LiteLLM: 接続失敗 ({})", ll_ready);
         }
     }
 

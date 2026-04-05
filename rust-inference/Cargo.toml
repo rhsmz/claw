@@ -1,0 +1,11 @@
+[package]
+name = "rust-inference-stub"
+version = "0.1.0"
+edition = "2021"
+description = "ローカル検証用スタブ。コンテナ内の推論は llama-server（SYCL ビルド）が担当する。"
+
+[[bin]]
+name = "rust-inference-stub"
+path = "src/main.rs"
+
+[dependencies]

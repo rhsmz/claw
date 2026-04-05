@@ -30,10 +30,11 @@ Windows（cmd）の例: `copy .env.example .env`
 | | `ZEROCLAW_DB_NAME` | PostgreSQL 上の DB 名（Compose の `POSTGRES_DB` と一致させる） |
 | LLM | `LITELLM_MASTER_KEY` | LiteLLM のマスターキー（ZeroClaw の `API_KEY` 等と揃える） |
 | | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` / `MISTRAL_API_KEY` | クラウドプロバイダ利用時 |
-| | `DEFAULT_MODEL` / `FALLBACK_MODEL` | 既定・フォールバックモデル（`litellm_config.yaml` と整合） |
-| | `OLLAMA_IMAGE` | Ollama サービスの Docker イメージ（既定 `ollama/ollama:0.20.0-rc1`。安定版リリース後はタグ更新可。412 時は `pull` で更新） |
-| | `OLLAMA_LAUNCH_LOCATION` | `docker`（既定）= Compose の `ollama` サービスをプロファイル `ollama-docker` で起動 / `host` または `windows` = ホストOSの Ollama（コンテナは起動しない。先に Ollama を起動すること） |
-| | `OLLAMA_API_BASE` | LiteLLM・MCP コンテナから Ollama へ届けるベース URL。`task up` 系スクリプトは未設定時に `docker`→`http://ollama:11434`、`host`→`http://host.docker.internal:11434` をプロセス環境で補う。手動で `docker compose up` だけ使う場合は `.env` に明示推奨 |
+| | `DEFAULT_MODEL` / `FALLBACK_MODEL` | 既定・フォールバックモデル（`litellm_config.yaml` の `model_name` と整合） |
+| | `RUST_INFERENCE_MODELS_DIR` | `rust-inference` にマウントする GGUF 置き場（既定 `./storage/rust-inference-models`） |
+| | `RUST_INFERENCE_HOST_PORT` | ホストから llama-server を叩くポート（既定 `9080`。コンテナ内は `8080`） |
+| | `RUST_INFERENCE_ONEAPI_VERSION` / `LLAMA_CPP_REF` / `GGML_SYCL_F16` | `rust-inference` イメージのビルド引数（上級者向け） |
+| | `LLAMA_MODEL_PATH` / `N_GPU_LAYERS` / `LLAMA_EXTRA_ARGS` | コンテナ内 `llama-server` の挙動調整（任意） |
 | DB / キャッシュ | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST` / `POSTGRES_PORT` | DB 接続（Compose 内ホスト名は `postgres`、コンテナ内ポートは常に `5432`） |
 | | `POSTGRES_HOST_PORT` | **ホストへ公開する** Postgres ポート（既定 `5432`。ホストで 5432 が使用中なら `5433` など） |
 | | `REDIS_URL` | Redis 接続 URL |

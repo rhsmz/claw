@@ -4,6 +4,10 @@ mcp/gateway.env
 # Rust build output (scripts/management)
 scripts/management/target/
 
+# rust-inference スタブクレート（Docker ビルドが本体）
+rust-inference/target/
+rust-inference/Cargo.lock
+
 # Crew per-agent runtime artifacts — not committed (see crew/README.md, workflow_contract.md).
 # Templates under crew/_template/ stay tracked via negation rules.
 crew/*/work_logs/

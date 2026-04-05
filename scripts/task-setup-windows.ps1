@@ -8,7 +8,7 @@ if (-not (Test-Path -LiteralPath "mcp/gateway.env")) {
     Copy-Item -LiteralPath "mcp/gateway.env.example" -Destination "mcp/gateway.env"
 }
 
-foreach ($d in @("prompts", "skills", "storage/postgres", "mcp/vault", "wiki/notion", "wiki/confluence")) {
+foreach ($d in @("prompts", "skills", "storage/postgres", "storage/rust-inference-models", "mcp/vault", "wiki/notion", "wiki/confluence")) {
     New-Item -ItemType Directory -Force -Path $d | Out-Null
 }
 

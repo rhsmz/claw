@@ -23,7 +23,7 @@ auto_save = true
 provider = "openai"
 base_url = "http://litellm:4000/v1"
 api_key = "${LITELLM_MASTER_KEY}"
-# Compose の DEFAULT_MODEL（例: gemma4:e2b）。LiteLLM が ollama/gemma4:e2b へ転送する。
+# Compose の DEFAULT_MODEL（litellm_config.yaml の model_name と一致。例: imperial-logic-high-v1）
 model = "${DEFAULT_MODEL}"
 timeout_sec = 900 # 長大な法務監査や多言語コンパイル時間を考慮
 max_retries = 3

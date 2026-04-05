@@ -1,6 +1,6 @@
 # adbx-claw
 
-ローカル環境向けの生成 AI スタックを **Docker Compose** でまとめたリポジトリです。Ollama による推論、LiteLLM による API 正規化とルーティング、Open WebUI によるチャット UI、ZeroClaw による軽量エージェントランタイム、Langfuse による可観測性、PostgreSQL（pgvector）による永続化とベクトル検索、Docker MCP Gateway によるツール接続の土台を、同一ネットワーク上で連携させます。
+ローカル環境向けの生成 AI スタックを **Docker Compose** でまとめたリポジトリです。**rust-inference**（llama.cpp・Intel SYCL 版 `llama-server`）によるローカル推論、LiteLLM による API 正規化とルーティング、Open WebUI によるチャット UI、ZeroClaw による軽量エージェントランタイム、Langfuse による可観測性、PostgreSQL（pgvector）による永続化とベクトル検索、Docker MCP Gateway によるツール接続の土台を、同一ネットワーク上で連携させます。
 
 ## ドキュメント一覧
 
@@ -23,7 +23,7 @@ flowchart LR
     L[LiteLLM :4000]
   end
   subgraph inference [推論]
-    O[Ollama :11434]
+    RI[rust-inference :8080]
   end
   subgraph data [データ]
     PG[(PostgreSQL + pgvector)]
@@ -33,7 +33,7 @@ flowchart LR
   end
   WebUI --> L
   ZC --> L
-  L --> O
+  L --> RI
   L -.-> LF
   WebUI --> PG
   ZC --> PG
@@ -43,7 +43,7 @@ flowchart LR
 | コンポーネント | 役割 | ホスト向けポート（既定） |
 |----------------|------|---------------------------|
 | [PostgreSQL + pgvector](https://github.com/pgvector/pgvector) | アプリ DB・ベクトル拡張 | 5432 |
-| [Ollama](https://ollama.com/) | ローカル LLM 推論 | 11434 |
+| rust-inference（`rust-inference/` の Dockerfile） | llama.cpp SYCL・OpenAI 互換 `llama-server` | コンテナ内 8080／ホストは `.env` の `RUST_INFERENCE_HOST_PORT`（既定 9080） |
 | [LiteLLM](https://docs.litellm.ai/) | OpenAI 互換ゲートウェイ・モデルルーティング・Langfuse 連携 | 4000 |
 | [Langfuse](https://langfuse.com/)（v3 イメージ、`--profile ui`） | トレース・分析 | 3000 |
 | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | Rust 製エージェントランタイム | `.env` の `ZEROCLAW_GATEWAY_PORT`（例: 42617） |
@@ -54,17 +54,17 @@ flowchart LR
 ### Docker Compose（本リポジトリの現状）
 
 - **Compose ファイル**は V2 形式です（トップレベル `version` は未使用）。プロジェクト名は **`name: zeroclaw-enterprise`** で固定しています。CLI は **`docker compose`**（ハイフン無し）を想定しています（`task` からも同様）。
-- **既定の `task up`** では **PostgreSQL・Redis・LiteLLM・MCP Gateway・Stack Portal（既定 :8042）** に加え、`.env` の **`OLLAMA_LAUNCH_LOCATION=docker`（既定）** のときだけ **Ollama コンテナ**（プロファイル `ollama-docker`）を起動します。**`OLLAMA_LAUNCH_LOCATION=host`（別名 `windows`）** のときは Ollama コンテナは起動せず、**ホスト上の Ollama**（例: Windows ネイティブ）へ `OLLAMA_API_BASE`（未設定時は `http://host.docker.internal:11434`）で接続します。手動で `docker compose up -d` だけ使う場合は、Docker 版 Ollama を使うとき **`--profile ollama-docker`** が必要です。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、`task up` は **`docker compose up -d --wait`** でヘルス待ちします（Compose v2.29+ 推奨。未対応ならスクリプトから `--wait` を外してください）。`litellm_config.yaml` の Ollama `api_base` は **`OLLAMA_API_BASE` 環境変数**（`os.environ/OLLAMA_API_BASE`）を参照します。
+- **既定の `task up`** では **PostgreSQL・Redis・rust-inference・LiteLLM・MCP Gateway・Stack Portal（既定 :8042）** を起動します。`rust-inference` は **Intel GPU + Linux ホストまたは WSL2**（`/dev/dri` マウント）で SYCL 推論を想定しています。**GGUF モデル**を `.env` の `RUST_INFERENCE_MODELS_DIR`（既定 `./storage/rust-inference-models`）に配置しないと `rust-inference` のヘルスチェックが通らず、LiteLLM も起動待ちで止まります。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、`task up` は **`docker compose up -d --wait`** でヘルス待ちします（Compose v2.29+ 推奨）。`litellm_config.yaml` のローカルモデルは **`http://rust-inference:8080/v1`** を向けます。
 - **Open WebUI（:8080）と Langfuse（:3000）** は **プロファイル `ui`** で起動します（ClickHouse / MinIO / Langfuse 専用 Redis を同梱）。初回はイメージ取得と DB マイグレーションで **数分**かかることがあります。例: `docker compose --profile ui up -d` または **`task up-with-ui`**。`.env` の `OPEN_WEBUI_SECRET_KEY` と `LANGFUSE_*`（`LANGFUSE_ENCRYPTION_KEY` は `openssl rand -hex 32` 推奨）を起動前に変更してください。
 - **ZeroClaw** は **`ghcr.io/zeroclaw-labs/zeroclaw:latest`** を **プロファイル `zeroclaw`** で任意起動します。公式デプロイに合わせ **`zeroclaw_data` ボリューム**（`/zeroclaw-data`）にワークスペースを保持し、**`zeroclaw/config.toml` を `.../.zeroclaw/config.toml` に read-only マウント**します。`[[crews]]` を含む本リポジトリの設定は OSS 版と完全には一致しない可能性があるため、起動しない場合は `zeroclaw doctor` / ログで照合してください。起動例: `docker compose --profile zeroclaw up -d` または `task up-with-zeroclaw`。
-- 初回は Ollama 側でモデルを取得してください（例: `task ollama-pull`）。
+- 初回は **GGUF を上記ディレクトリへ手動で配置**し、`docker compose build rust-inference`（初回のみビルドが非常に重い）のあと `task up` してください。配置場所のヒント: `task rust-inference-models-hint`。
 - **Task** は [dotenv](https://taskfile.dev/docs/guide/#dotenv-files) でルートの `.env` を読み込みます（`sync` / `audit` / `command` 等で変数が使えます）。`desc` に `[Rust]` のような角括弧がある場合は YAML 上クォートが必要なため、Taskfile では文字列としてエスケープ済みです。
 
 ## 前提条件
 
   - [Docker](https://docs.docker.com/get-docker/) および [Docker Compose V2](https://docs.docker.com/compose/)（`docker compose` サブコマンドが使えること）
   - （任意）[Task](https://taskfile.dev/installation/)（`Taskfile.yml` のタスクを使う場合）
-  - **GPU 利用時**: NVIDIA GPU と [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。現行の `docker-compose.yml` の **Ollama は CPU 既定**です。GPU を使う場合は [Compose の deploy.resources](https://docs.docker.com/compose/compose-file/deploy/) で `ollama` にデバイス予約を追加してください。
+  - **Intel GPU（推奨）**: Linux または WSL2 でホストドライバと `/dev/dri` をコンテナへ渡せる構成。CPU のみでは極めて遅い場合があります。`docker-compose.yml` の `devices: /dev/dri` は **Windows ネイティブ Docker では動かない**ことがあります（WSL2 バックエンドを推奨）。
 
 ## クイックスタート
 
@@ -107,25 +107,18 @@ Task を使わない場合:
 
 ```bash
 docker compose config --quiet
-# Ollama をコンテナで動かすとき（ホスト Ollama のときは .env で OLLAMA_API_BASE を合わせ、プロファイルは付けない）
-docker compose --profile ollama-docker up -d
+docker compose up -d --wait
 ```
 
-### 4\. モデルの取得
+### 4\. モデル（GGUF）の配置
 
-Ollama コンテナが起動したら、**`.env` の `DEFAULT_MODEL` と `litellm_config.yaml` の `model_name` に存在するモデル**を pull します（例は `llama3.1`。`gemma4:e2b` など別名を使う場合は両方のファイルを揃えたうえで `task ollama-pull -- MODEL=gemma4:e2b` など）。
+1. [Hugging Face](https://huggingface.co/models?library=gguf) 等から **GGUF** をダウンロードし、`storage/rust-inference-models/`（または `.env` の `RUST_INFERENCE_MODELS_DIR`）へ置きます。複数ある場合はファイル名昇順で最初の `.gguf` が選ばれます。特定ファイルだけ使う場合は `.env` で `LLAMA_MODEL_PATH=/app/models/YourModel.gguf` のように **コンテナ内パス**を指定します。
+2. **`.env` の `DEFAULT_MODEL`** を `litellm_config.yaml` の `model_list[].model_name` のいずれか（例: `imperial-logic-high-v1`）と一致させます。
+3. `llama-server` が受け付ける OpenAI 互換の `model` 名は `litellm_config.yaml` の `litellm_params.model`（既定 `openai/gpt-3.5-turbo`）で調整できます。
 
-```bash
-task ollama-pull
-# 別モデルの例
-task ollama-pull -- MODEL=gemma4:e2b
-```
+### 4b. hexa RAG とモデル
 
-手動の例:
-
-```bash
-docker compose exec ollama ollama pull llama3.1
-```
+Ollama を廃止したため、**hexa-vector.config.json** で想定していた埋め込み・LLM を **別経路**（クラウド API、LiteLLM に追加した埋め込みモデル、独自バイナリ等）で用意する必要があります。方針のメモは `task hexa-rag-models-hint` を参照してください。ingest 自体は `task rag-ingest` が従来どおり利用できます（MCP 側のサーバ有効化は [mcp/README.md](mcp/README.md) 参照）。
 
 ### 5\. ブラウザで開く（例）
 
@@ -135,7 +128,7 @@ docker compose exec ollama ollama pull llama3.1
 | Open WebUI | http://localhost:8080 | **`task up-with-ui`**（`--profile ui`）後に表示 |
 | Langfuse | http://localhost:3000 | 同上。MinIO コンソールは http://localhost:9091（127.0.0.1 のみ公開） |
 | LiteLLM（OpenAI 互換ベース） | http://localhost:4000 | コアスタックの `task up` で起動 |
-| Ollama API | http://localhost:11434 | `curl http://localhost:11434/api/tags` など |
+| rust-inference（ヘルス） | http://localhost:9080/health（既定） | ポートは `RUST_INFERENCE_HOST_PORT`。OpenAI 互換 API は LiteLLM 経由を推奨 |
 
 ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後に `.env` の `ZEROCLAW_GATEWAY_PORT`（例: http://localhost:42617）で開きます。ポータルから同 URL へリンクしています。
 
@@ -153,7 +146,7 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 |--------|------|
 | `task` | タスク一覧表示 |
 | `task setup` | 初回準備（`.env` / `gateway.env`・`wiki/notion` 等のディレクトリ） |
-| `task up` / `task down` | コアスタックの起動・停止（`OLLAMA_LAUNCH_LOCATION` で Ollama コンテナ or ホスト） |
+| `task up` / `task down` | コアスタックの起動・停止（rust-inference を含む） |
 | `task ps` / `task status` | `docker compose ps` |
 | `task logs` / `task logs-mcp` / `task logs-ui` / `task logs-zeroclaw` | サービス別ログ追跡 |
 | `task up-with-ui` | Open WebUI（8080）・Langfuse（3000）（`--profile ui`） |
@@ -162,9 +155,9 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 | `task config` / `task compose-validate` | `docker compose config --quiet` |
 | `task pull` | `docker compose pull`（イメージ更新取得） |
 | `task down-volumes` | ボリュームごと削除（**データ全消去**・確認プロンプトあり） |
-| `task ollama-pull` | Ollama でモデル取得（`docker`=コンテナ内 / `host`=ホスト CLI。上書き: `task ollama-pull -- MODEL=...`） |
-| `task logs-ollama-docker` | Compose 内 Ollama のログ（コンテナ運用時のみ） |
-| `task hexa-ollama-pull` / `task rag-ingest` | ローカル RAG（hexa-rag）用モデル取得・ingest |
+| `task rust-inference-models-hint` | GGUF 配置パスのリマインダ |
+| `task hexa-rag-models-hint` / `task rag-ingest` | hexa RAG のモデル方針メモ・ingest |
+| `task logs-rust-inference` | rust-inference のログ |
 | `task mcp-sync` | `mcp-gateway` 再起動 |
 | `task test` | `docker compose config` + `cargo test`（`scripts/management`） |
 | `task test-smoke` | 公開ポートの HTTP/TCP スモーク（**スタック起動後**・WSL/macOS/Linux で `bash` 利用可） |
@@ -178,14 +171,15 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 | `mcp/gateway.env` | MCP ツール用シークレット（`.gitignore` 済み。`gateway.env.example` から作成） |
 | `mcp/README.md` | MCP Gateway の設定方針（カタログ・`docker.sock`・クライアント接続） |
 | `docker-compose.yml` | サービス定義・ネットワーク・ボリューム |
-| `litellm_config.yaml` | LiteLLM のモデル一覧と Langfuse コールバック（Ollama の `api_base` は `OLLAMA_API_BASE`） |
-| `scripts/docker-compose-with-ollama.sh` / `.ps1` | `OLLAMA_LAUNCH_LOCATION` に応じて Compose に `ollama-docker` プロファイルを付与し `OLLAMA_API_BASE` を補う（`task up` 系から利用） |
+| `litellm_config.yaml` | LiteLLM のモデル一覧と Langfuse コールバック（ローカルは `http://rust-inference:8080/v1`） |
+| `scripts/docker-compose-stack.sh` / `.ps1` | `docker compose` への薄いラッパー（`task up` 系から利用） |
+| `rust-inference/` | Intel SYCL 版 llama-server の Docker ビルドコンテキスト |
 | `postgres-init/01-init-databases.sql` | 初回のみ: 複数 DB 作成と `vector` 拡張 |
 | `postgres-init/02-imperial-management.sql` | 初回のみ: 管理 CLI 用 `documents` / `audit_logs`（任意で CLI の `ensure_schema` と二重でも可） |
 
 LiteLLM 経由で呼ぶモデル名は、`litellm_config.yaml` の `model_list[].model_name` と `.env` の `DEFAULT_MODEL`（ZeroClaw 用）を一致させてください。
 
-## Ollama と 外部 API・MCP ツールの連携
+## ローカル推論・外部 API・MCP ツールの連携
 
 推論だけでなく、**MCP（Model Context Protocol）** と **クラウド API** で調査・開発・インフラ・法務・通知まで幅広く繋げられます。エージェント側の「どのスキルがどの MCP サーバ名を指すか」の正は **`zeroclaw/config.toml` の `[[skills]]`（現状 40 件）** です。ゲートウェイが実際に起動するプロセスは **`mcp/config.json` の `mcpServers` キー**で定義します。両者の名前は一致させる必要があり、サンプルの `config.json` には **10 キー分**しか無いため、本番で使うスキルに応じて [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) 等を参照しエントリを増やしてください。詳細な対応表とギャップ一覧は **[mcp/README.md](mcp/README.md)**、環境変数は **[ENV.md](ENV.md)** を参照してください。
 
@@ -193,7 +187,7 @@ LiteLLM 経由で呼ぶモデル名は、`litellm_config.yaml` の `model_list[]
 
 | 種別 | 役割 | 設定の場所 |
 |------|------|------------|
-| **Ollama** | ローカル推論 | `litellm_config.yaml` の `ollama/...` と `api_base: http://ollama:11434` |
+| **rust-inference** | ローカル推論（GGUF） | `litellm_config.yaml` の `api_base: http://rust-inference:8080/v1` |
 | **OpenAI / Anthropic / Google / Mistral 等** | クラウド推論（任意） | ルート `.env` の `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` / `MISTRAL_API_KEY` 等。`docker-compose.yml` の `litellm` 経由。 |
 
 Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイントにしているため、UI のモデル選択でローカルとクラウドを切り替えられます。**本スタックでは推論は LiteLLM を軸に**揃えています。
@@ -229,17 +223,19 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
   - **MCP のサーバ名が合わない** `zeroclaw/config.toml` の各スキルの `mcp_server` と、`mcp/config.json` のキー名が一致している必要があります（例: 調査系は `search`）。起動失敗やツールが出ない場合は [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) または `docker mcp` CLI で実名を確認し、`config.json` を修正してください。
 
-  - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 11434 / ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。**PostgreSQL** は `.env` の **`POSTGRES_HOST_PORT`**（既定 `5432`）でホスト側ポートを変えられます（例: `5433`。コンテナ同士の接続は引き続き `postgres:5432`）。その他は競合プロセスを止めるか、`docker-compose.yml` の `ports` を変更します。
+  - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 9080（rust-inference 既定）/ ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。**PostgreSQL** は `.env` の **`POSTGRES_HOST_PORT`**（既定 `5432`）でホスト側ポートを変えられます（例: `5433`。コンテナ同士の接続は引き続き `postgres:5432`）。**rust-inference のホスト公開**は `RUST_INFERENCE_HOST_PORT` で変更できます。
 
-  - **Ollama で `pull model manifest: 412`（newer version / pre-release）** コンテナ内の Ollama が古いか、`ollama/ollama:latest` がローカルで stale です。`docker compose pull ollama` のあと `docker compose up -d ollama`（または `docker compose up -d --force-recreate ollama`）でイメージを更新してください。Compose は既定で **`OLLAMA_IMAGE`**（例: `ollama/ollama:0.20.0-rc1`）を使います。`.env` に追記する場合は `.env.example` を参照し、[Ollama Releases](https://github.com/ollama/ollama/releases) でタグを確認してください。
+  - **rust-inference のビルド失敗・イメージ pull 失敗** `intel/deep-learning-essentials` のタグは `.env` の `RUST_INFERENCE_ONEAPI_VERSION` で上書き可能です。llama.cpp のタグは `LLAMA_CPP_REF`（既定 `b5377`）です。[llama.cpp SYCL ドキュメント](https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/SYCL.md) を参照してください。
 
-  - **推論が 404 / model not found** `DEFAULT_MODEL`・`litellm_config.yaml` の `model_name`・Ollama 内の `ollama list` の三者が一致しているか確認してください。
+  - **`/dev/dri` 関連で compose が失敗する（Windows ネイティブ Docker 等）** Intel GPU パススルーが使えない環境では、`docker-compose.yml` の `rust-inference.devices` を一時的にコメントアウトするか、**Docker Desktop の WSL2 バックエンド**で Linux 側に GPU を公開できる構成へ切り替えてください（CPU フォールバックは極めて遅い場合があります）。
 
-  - **推論が 401 / OpenAI `invalid_api_key`（ローカルモデル名なのに）** LiteLLM は **`model_list` に無いモデル名**を OpenAI API 向けに送ります（`OPENAI_API_KEY` が検証される）。Ollama で使いたい名前は **`litellm_config.yaml` に `model_name` と `litellm_params.model: ollama/<Ollama名>`、`api_base: http://ollama:11434` を追加**し、LiteLLM を再起動してください。`docker compose exec ollama ollama list` でイメージの有無も確認します。
+  - **推論が 404 / model not found** `DEFAULT_MODEL`・`litellm_config.yaml` の `model_name`・実際にマウントした GGUF（`LLAMA_MODEL_PATH` またはディレクトリ内の先頭 `.gguf`）を確認してください。
+
+  - **推論が 401 / OpenAI `invalid_api_key`（ローカルモデル名なのに）** LiteLLM は **`model_list` に無いモデル名**をクラウド OpenAI 向けに送ることがあります。使いたい表示名は **`litellm_config.yaml` に `model_name` を追加**し、LiteLLM を再起動してください。
 
   - **ZeroClaw イメージ** 配布イメージに関する報告が [Issue \#3687](https://github.com/zeroclaw-labs/zeroclaw/issues/3687) などにあります。起動しない場合はタグの固定やビルド元の確認を検討してください。
 
-  - **データの完全削除** `task down-volumes`（`docker compose down -v`）は PostgreSQL・Ollama・WebUI などの名前付きボリュームを削除します。復元できないので、実行前に内容を確認してください。
+  - **データの完全削除** `task down-volumes`（`docker compose down -v`）は PostgreSQL・WebUI などの名前付きボリュームを削除します。GGUF はホストの `storage/rust-inference-models` にあるため通常は残りますが、実行前に内容を確認してください。
 
   - **Langfuse** 自己ホスト v2 向けの変数（`DATABASE_URL`、`NEXTAUTH_SECRET`、`SALT`、`ENCRYPTION_KEY` 等）を `.env` で必ず設定してください。公開 URL が変わる場合は `LANGFUSE_NEXTAUTH_URL` も合わせて変更します。LiteLLM からトレースが表示されないときは、Langfuse 側のプロジェクトキーと `.env` の `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` を照合してください。
 
