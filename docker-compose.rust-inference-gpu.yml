@@ -1,0 +1,20 @@
+# Intel GPU（WSL2 / Linux）向け rust-inference オーバーライド。
+#
+# 前提: コンテナへ渡すのは Linux DRM の /dev/dri（card* / renderD*）。
+# WSL2 では /dev/dxg だけ見えて /dev/dri が無いことがある（dxg は D3D 用で SYCL/Level Zero の代替にはならない）。
+# `devices: /dev/dri` はディレクトリを渡せず失敗しやすいため、`/dev/dri` をボリュームでマウントする。
+#
+# 初回:
+#   docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu.yml build rust-inference
+# 起動:
+#   docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu.yml up -d --wait
+#
+# ONEAPI_DEVICE_SELECTOR は docker-compose.yml の rust-inference で既定化済み（空不可）。
+# 変更はルート .env の ONEAPI_DEVICE_SELECTOR（例: opencl:gpu）。
+services:
+  rust-inference:
+    build:
+      args:
+        KEEP_SYCL_PLUGIN: "1"
+    volumes:
+      - /dev/dri:/dev/dri

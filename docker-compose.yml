@@ -1,67 +1,479 @@
+# Compose V2 形式（version キーは不要）。
+# 既定: Postgres / Redis / rust-inference（llama.cpp SYCL）/ LiteLLM / MCP Gateway / Stack Portal（既定 :8042）
+# Web UI（Open WebUI :8080 / Langfuse :3000）: docker compose --profile ui up -d
+# 軽量 Rust UI（Llumen :8079 既定）: docker compose --profile ui-llumen up -d
+# ZeroClaw: docker compose --profile zeroclaw up -d
+# Rust 薄型 LLM ゲートウェイ（LiteLLM 代替 PoC）: docker compose --profile rust-gateway up -d
+# WSL2 + OpenCL（/dev/dxg・/dev/dri・/usr/lib/wsl/lib）: docker compose --profile opencl-wsl up -d（task up-with-opencl-wsl）
+# rust-inference: Intel GPU は Linux ホストまたは WSL2 で /dev/dri をマウント。モデルは RUST_INFERENCE_MODELS_DIR に .gguf を配置。
+# 参考: https://docs.docker.com/compose/ / ZeroClaw deployment（公式イメージ・設定マウント）
+
+name: zeroclaw-enterprise
+
 services:
-  # データベース: Context7 (RAG) とエージェントの記憶用
   postgres:
     image: ankane/pgvector:latest
+    restart: unless-stopped
+    init: true
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${ZEROCLAW_DB_NAME}
+      ZEROCLAW_DB_NAME: ${ZEROCLAW_DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # ホストで 5432 が使用中のときは .env の POSTGRES_HOST_PORT を 5433 等に変更（コンテナ内は常に 5432）
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${ZEROCLAW_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" || exit 1"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      # 初回 init（複数 DB / 拡張）が長引く環境向け
+      start_period: 60s
 
-  # 高速キャッシュ: バックエンド部隊の検証用
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    init: true
     command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  # LLMプロキシ: コスト管理・リトライ・冗長化の要
+  rust-inference:
+    build:
+      context: ./rust-inference
+      args:
+        ONEAPI_VERSION: ${RUST_INFERENCE_ONEAPI_VERSION:-2025.3.2-0-devel-ubuntu24.04}
+        LLAMA_CPP_REF: ${LLAMA_CPP_REF:-master}
+        GGML_SYCL_F16: ${GGML_SYCL_F16:-OFF}
+        KEEP_SYCL_PLUGIN: ${RUST_INFERENCE_KEEP_SYCL:-0}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${RUST_INFERENCE_HOST_PORT:-9080}:8080"
+    volumes:
+      - ${RUST_INFERENCE_MODELS_DIR:-./storage/rust-inference-models}:/app/models:ro
+    # Intel iGPU 透過は docker-compose.rust-inference-gpu.yml を併用（ホストに /dev/dri がある場合）
+    environment:
+      LLAMA_MODEL_PATH: ${LLAMA_MODEL_PATH:-}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:--1}
+      # SYCL 利用時は空にできない。GPU compose では opencl:gpu 等へ上書き可（.env / オーバーライド参照）
+      ONEAPI_DEVICE_SELECTOR: ${ONEAPI_DEVICE_SELECTOR:-level_zero:gpu}
+      LLAMA_EXTRA_ARGS: ${LLAMA_EXTRA_ARGS:-}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+
+  # llama-server（GGML OpenCL）— WSL2: Intel 公式に従い dxcore 用に /usr/lib/wsl 全体をマウント（lib だけでは GPU が列挙されないことがある: intel/compute-runtime#625）。
+  # /dev/dxg 必須。/dev/dri は vgem 等のダミーでも可だが、OpenCL の GPU 検出は主に dxcore（上記マウント）側。
+  # LiteLLM では model_name imperial-*-wsl-oc → http://opencl-inference:8080/v1（.env の DEFAULT_MODEL を合わせる）
+  opencl-inference:
+    profiles: ["opencl-wsl"]
+    build:
+      context: ./opencl-inference
+      args:
+        LLAMA_CPP_REF: ${LLAMA_CPP_REF:-master}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${OPENCL_INFERENCE_HOST_PORT:-9081}:8080"
+    volumes:
+      - ${RUST_INFERENCE_MODELS_DIR:-./storage/rust-inference-models}:/app/models:ro
+      # WSL ゲストのツリーごと（/usr/lib/wsl/lib 単体マウントでは clGetPlatformIDs が 0 になりやすい）
+      - /usr/lib/wsl:/usr/lib/wsl:ro
+      # rust-inference GPU と同様、ディレクトリは bind（devices ではなく volumes）
+      - /dev/dri:/dev/dri
+    devices:
+      - /dev/dxg:/dev/dxg
+    environment:
+      # dxcore 等は /usr/lib/wsl/lib を先に（Intel WSL+Docker 推奨パス順に近づける）
+      LD_LIBRARY_PATH: /usr/lib/wsl/lib:/app:/app/lib
+      LLAMA_MODEL_PATH: ${LLAMA_MODEL_PATH:-}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:--1}
+      LLAMA_EXTRA_ARGS: ${LLAMA_EXTRA_ARGS:-}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+
+  # Axum 製の最小 OpenAI 互換プロキシ（モデル名エイリアス → llama-server）。LiteLLM と併用可。
+  llm-gateway-rust:
+    profiles: ["rust-gateway"]
+    build:
+      context: ./llm-gateway-proxy
+    restart: unless-stopped
+    init: true
+    depends_on:
+      rust-inference:
+        condition: service_healthy
+    ports:
+      - "${LLM_GATEWAY_RUST_HOST_PORT:-4100}:4100"
+    environment:
+      BIND_ADDR: 0.0.0.0:4100
+      UPSTREAM_OPENAI_BASE: http://rust-inference:8080/v1
+      OPENAI_COMPAT_MODEL: openai/gpt-3.5-turbo
+      UPSTREAM_API_KEY: dummy-key
+      GATEWAY_API_KEY: ${LITELLM_MASTER_KEY}
+      MODEL_ALIASES: imperial-logic-high-v1,imperial-build-knight-v1,imperial-scout-mini-v1
+    healthcheck:
+      test:
+        ["CMD", "curl", "-fsS", "http://127.0.0.1:4100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rust-inference:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./litellm/config.yaml:/app/config.yaml
+      - ./litellm_config.yaml:/app/config.yaml:ro
+      # Prisma baseline / diff 用（同一 DB に postgres-init があると P3005 → baseline 処理が走る）
+      - litellm_migrations:/var/lib/litellm-migrations
+    ports:
+      - "4000:4000"
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
-    ports:
-      - "4000:4000"
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      LITELLM_MIGRATION_DIR: /var/lib/litellm-migrations
+    command:
+      - "--config"
+      - "/app/config.yaml"
+      - "--port"
+      - "4000"
+    # /health は Bearer 必須かつ全モデルへ実リクエストのためプローブに不向き。
+    # 公式: /health/readiness は未認証で DB・キャッシュ接続を確認。
+    # 公式イメージ（Wolfi）に curl が無いため python で HTTP 200 を確認する。
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=8)",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 600s
 
-  # MCP Gateway: 39のスキル（神器）を統合するハブ
-  mcp-gateway:
-    image: mcp/gateway:latest
+  # 静的ポータル（ZeroClaw / LiteLLM / Open WebUI 等へのジャンプページ）
+  stack-portal:
+    image: nginx:alpine
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${STACK_PORTAL_PORT:-8042}:80"
     volumes:
-      - ./mcp/config.json:/app/config.json
-      - ./mcp/vault:/app/vault:ro # 機密情報
+      - ./stack-portal:/usr/share/nginx/html:ro
+
+  # ---------------------------------------------------------------------------
+  # 軽量チャット UI（プロファイル ui-llumen）— Llumen（Rust / OpenAI 互換）
+  # 既定 API は LiteLLM。Rust ゲートウェイ経由にする場合は LLUMEN_OPENAI_BASE を参照。
+  # ---------------------------------------------------------------------------
+  llumen:
+    profiles: ["ui-llumen"]
+    image: ghcr.io/pinkfuwa/llumen:latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      litellm:
+        condition: service_healthy
+    ports:
+      - "${LLUMEN_HOST_PORT:-8079}:80"
     environment:
-      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY}
-      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PAT}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
+      API_KEY: ${LITELLM_MASTER_KEY}
+      API_BASE: ${LLUMEN_OPENAI_BASE:-http://litellm:4000/v1}
+      BIND_ADDR: "0.0.0.0:80"
+      DATA_PATH: /data
+    volumes:
+      - llumen_data:/data
+
+  # ---------------------------------------------------------------------------
+  # Web UI（プロファイル ui）— postgres-init で openwebui_db / langfuse_db を作成済み
+  # ---------------------------------------------------------------------------
+  open-webui:
+    profiles: ["ui"]
+    image: ghcr.io/open-webui/open-webui:main
+    restart: unless-stopped
+    init: true
     depends_on:
       postgres:
         condition: service_healthy
-
-  # ZeroClaw Server: 帝国の本体
-  zeroclaw:
-    build: .
-    volumes:
-      - ./config.toml:/app/config.toml
-      - ./prompts:/app/prompts
-      - ./skills:/app/skills
+      litellm:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
     environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # Postgres バックエンド（同一クラスタの openwebui_db）
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/openwebui_db
+      WEBUI_SECRET_KEY: ${OPEN_WEBUI_SECRET_KEY:-change-me-open-webui-secret}
+      # 推論は LiteLLM（OpenAI 互換）経由
+      ENABLE_OLLAMA_API: "false"
+      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+    volumes:
+      - open_webui_data:/app/backend/data
+
+  # Langfuse v3（公式 compose 準拠: ClickHouse / MinIO / 専用 Redis を同梱）
+  langfuse-redis:
+    profiles: ["ui"]
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${LANGFUSE_REDIS_PASSWORD:-langfuse_dev_redis}", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${LANGFUSE_REDIS_PASSWORD:-langfuse_dev_redis}",
+          "ping",
+        ]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  langfuse-clickhouse:
+    profiles: ["ui"]
+    image: docker.io/clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  langfuse-minio:
+    profiles: ["ui"]
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data
+    environment:
+      MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+    volumes:
+      - langfuse_minio_data:/data
+    ports:
+      - "9090:9000"
+      - "127.0.0.1:9091:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  langfuse-worker:
+    profiles: ["ui"]
+    image: docker.io/langfuse/langfuse-worker:3
+    restart: unless-stopped
+    depends_on: &langfuse_depends
+      postgres:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    environment: &langfuse_worker_env
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/langfuse_db
+      SALT: ${LANGFUSE_SALT:-change_me_langfuse_salt}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-false}
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_USE_AZURE_BLOB: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-langfuse_dev_redis}
+      REDIS_TLS_ENABLED: "false"
+
+  langfuse-web:
+    profiles: ["ui"]
+    image: docker.io/langfuse/langfuse:3
+    restart: unless-stopped
+    depends_on: *langfuse_depends
+    ports:
+      - "3000:3000"
+    environment:
+      <<: *langfuse_worker_env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-change_me_langfuse_nextauth}
+
+  mcp-gateway:
+    # 公式イメージ（Docker Hub Verified）。`mcp/gateway` は存在せず pull が拒否される
+    image: docker/mcp-gateway:v2
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # 既定トランスポートは stdio のため `up -d` だと stdin が閉じて即終了する。
+    # イメージの ENTRYPOINT は既に `mcp gateway run` まで含む。ここに `gateway`/`run` を足すと
+    # 「unknown command "gateway" for docker mcp gateway run」で exit 1 になる。
+    command:
+      - --port=8811
+      - --transport=sse
+      - --config=/app/config.json
+      # Linux/WSL では Docker Desktop のシークレット API が無い。リポジトリ同梱のテンプレを参照
+      - --secrets=/app/gateway-secrets.env
+      # v2: カタログ上のサーバ名を列挙しないと serverNames が空で「No server is enabled」になる（mcpServers JSON だけでは有効化されない）
+      - --servers=duckduckgo
+    ports:
+      - "8811:8811"
+    volumes:
+      - ./mcp/config.json:/app/config.json:ro
+      - ./mcp/gateway.env.example:/app/gateway-secrets.env:ro
+      - ./mcp/vault:/app/vault:ro
+      # filesystem / git ローカル代替が参照するワークスペース
+      # 依存削減のため external サービスではなく、こちらを読みます。
+      - ./prompts:/app/workspace/prompts:ro
+      - ./zeroclaw:/app/workspace/zeroclaw:ro
+      - ./scripts:/app/workspace/scripts:ro
+      - ./mcp:/app/workspace/mcp:ro
+      - ./postgres-init:/app/workspace/postgres-init:ro
+      - ./.git:/app/workspace/.git:ro
+      - ./README.md:/app/workspace/README.md:ro
+      - ./ENV.md:/app/workspace/ENV.md:ro
+      - ./Taskfile.yml:/app/workspace/Taskfile.yml:ro
+      - ./docker-compose.yml:/app/workspace/docker-compose.yml:ro
+      - ./litellm_config.yaml:/app/workspace/litellm_config.yaml:ro
+      - ./.env.example:/app/workspace/.env.example:ro
+      - ./hexa-vector.config.json:/app/workspace/hexa-vector.config.json:ro
+      - ./wiki:/app/wiki:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Docker CE / WSL 等で Desktop の MCP 機能検査を避ける（公式 README 推奨）
+      DOCKER_MCP_IN_CONTAINER: "1"
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      # hexa-rag-mcp (local RAG)
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${ZEROCLAW_DB_NAME}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      # @modelcontextprotocol/server-postgres は接続文字列を CLI 引数で要求するため、envmcp 経由で DATABASE_URL から生成
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}
+      # ローカル補助推論が必要な MCP 向け（OpenAI 互換）。未使用なら空でよい。
+      LOCAL_OPENAI_BASE_URL: ${LOCAL_OPENAI_BASE_URL:-http://litellm:4000/v1}
+
+  zeroclaw:
+    profiles: ["zeroclaw"]
+    image: ghcr.io/zeroclaw-labs/zeroclaw:latest
+    restart: unless-stopped
+    init: true
+    environment:
+      ZEROCLAW_ALLOW_PUBLIC_BIND: "true"
+      ZEROCLAW_GATEWAY_HOST: "0.0.0.0"
+      ZEROCLAW_GATEWAY_PORT: "42617"
+      # 既定プロバイダが openrouter のままだと sk- の API_KEY と整合せず起動失敗する
+      ZEROCLAW_PROVIDER: openai
+      ZEROCLAW_MODEL: ${DEFAULT_MODEL}
+      OPENAI_BASE_URL: http://litellm:4000/v1
+      API_KEY: ${LITELLM_MASTER_KEY}
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ZEROCLAW_DB_NAME: ${ZEROCLAW_DB_NAME}
+      DEFAULT_MODEL: ${DEFAULT_MODEL}
+    volumes:
+      # 公式デプロイ例: 設定は ~/.zeroclaw 相当へマウント
+      - zeroclaw_data:/zeroclaw-data
+      - ./zeroclaw/config.toml:/zeroclaw-data/.zeroclaw/config.toml:ro
+      - ./prompts:/zeroclaw-data/prompts:ro
     ports:
       - "42617:42617"
     depends_on:
-      - mcp-gateway
-      - litellm
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      mcp-gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "zeroclaw", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
+  zeroclaw_data:
+  litellm_migrations:
+  llumen_data:
+  open_webui_data:
+  langfuse_redis_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:

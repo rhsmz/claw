@@ -2,25 +2,53 @@
     "mcpServers": {
       "search": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-        "env": { "BRAVE_SEARCH_API_KEY": "" }
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"]
       },
       "github": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-github"],
-        "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "" }
+        "args": ["-y", "@modelcontextprotocol/server-github"]
       },
       "postgres": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:pass@postgres:5432/db"]
+        "args": [
+          "-y",
+          "envmcp",
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-postgres",
+          "$DATABASE_URL"
+        ]
       },
       "filesystem": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/workspace"]
       },
+      "git": {
+        "command": "docker",
+        "args": [
+          "run",
+          "--rm",
+          "-i",
+          "--mount",
+          "type=bind,src=/app/workspace,dst=/app/workspace,ro",
+          "mcp/git"
+        ]
+      },
       "sequential-thinking": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+      },
+      "time": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-time"]
+      },
+      "arxiv": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-arxiv"]
+      },
+      "duckduckgo": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-duckduckgo"]
       },
       "node-runtime": {
         "command": "docker",
@@ -36,12 +64,29 @@
       },
       "context7": {
         "command": "npx",
-        "args": ["-y", "@context7/mcp-server"],
-        "env": { "CONTEXT7_API_KEY": "" }
+        "args": ["-y", "@context7/mcp-server"]
+      },
+      "notion_snapshots": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/wiki/notion"]
+      },
+      "confluence_snapshots": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/app/wiki/confluence"]
       },
       "mermaid": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-mermaid"]
+      },
+      "hexa_rag": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@hyphaene/hexa-rag-mcp",
+          "--config",
+          "/app/workspace/hexa-vector.config.json",
+          "serve"
+        ]
       }
     }
   }

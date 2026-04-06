@@ -1,97 +1,121 @@
-# ZeroClaw Enterprise: MCP Layer - The Imperial Arsenal
+# MCP レイヤー（Docker MCP Gateway）
 
-このディレクトリは、**「円卓の64人（The Sovereign 64）」**が現実世界を操作し、知性を実行力へと変換するための **MCP (Model Context Protocol)** サーバー群を管理します。
-
-39のスキル（神器）が、どのサーバーによって提供され、どのエージェントに紐付けられているかを定義します。
+このディレクトリは **Model Context Protocol (MCP)** 用の設定をまとめます。ZeroClaw エージェントは `zeroclaw/config.toml` で指定したゲートウェイ URL（既定: `http://mcp-gateway:8811/sse`）経由でツールにアクセスします。
 
 ---
 
-## 1. 接続アーキテクチャ
+## 1. 正（ソース・オブ・トゥルース）の整理
 
-エージェント（LLM）は `mcp-gateway` を通じて以下のサーバー群にアクセスします。
-各サーバーは、特定のプログラミング言語ランタイム、クラウドAPI、またはローカルファイルシステムへの特権アクセスを持ちます。
+| レイヤー | ファイル | 役割 |
+|----------|----------|------|
+| **スキル → MCP サーバ ID** | `zeroclaw/config.toml` の `[[skills]]` | 各 `name`（スキル）に `mcp_server = "..."` が対応。**エージェントがどのサーバ名を要求するか**の正はここです。現状 **40** スキルが定義されています。 |
+| **ゲートウェイが起動するサーバ** | `docker-compose.yml` の `mcp-gateway` の **`--servers`**（Docker MCP カタログ上の名前）が **有効化の正**。`mcp/config.json` の `mcpServers` は追加設定・クライアント互換用で、**v2 では `--servers` を付けないと「No server is enabled」のまま**カタログ由来のツールは載りません。 |
+| **シークレット・接続文字列** | ルート `.env`（Compose 補間）および `mcp/gateway.env`（運用テンプレート） | 変数の意味と Compose との関係は [ENV.md](../ENV.md) を参照。 |
 
----
-
-## 2. スキル・マッピング・マトリクス (39 Skills)
-
-| カテゴリ | スキル名 | 対応MCPサーバー | 主な利用者 |
-| :--- | :--- | :--- | :--- |
-| **知能・基盤** | `knowledge_base` | `context7` | 全指揮官, 監査部 |
-| | `logical_reasoning` | `sequential-thinking` | 全エージェント |
-| | `time_management` | `time` | PM, PMO, RM |
-| **調査・諜報** | `market_research` | `brave-search` | PdM, Scout, Strategist |
-| | `academic_research` | `arxiv` | CTO, Scout, Wizards |
-| | `web_search` | `duckduckgo` | Support, Scout |
-| | `knowledge_base_lookup` | `wikipedia` | Support, Scout |
-| **開発基盤** | `filesystem` | `filesystem` | Lead, Dev, Writer |
-| | `github_api` | `github` | 全エンジニア, PM |
-| | `code_interpreter` | `python-shell` | Test Devs, SRE |
-| | `api_testing` | `curl-executor` | Backend, Integration |
-| | `api_spec_manager` | `openapi-spec-tool` | Design Pod, Consistency |
-| **多言語実行** | `runtime_js` | `node-runtime` | Client Pod |
-| | `linter_js` | `eslint-analyzer` | Client Reviewer |
-| | `runtime_php` | `php-runtime` | Backend (PHP) |
-| | `linter_php` | `phpstan-analyzer` | PHP Hardener |
-| | `runtime_go` | `go-runtime` | Backend (Go), Infra |
-| | `linter_go` | `golangci-analyzer` | Go Sentinel |
-| | `runtime_rust` | `rust-runtime` | Backend (Rust) |
-| | `linter_rust` | `clippy-analyzer` | Rust Governor |
-| **データ・構造** | `db_operation` | `postgres` | Architect, Backend |
-| | `cache_design` | `redis` | Middleware Tuner |
-| | `diagram_generation` | `mermaid-renderer` | Architect, Writer |
-| **法務・規約** | `legal_research` | `legal-db-api` | General Counsel |
-| | `ip_search` | `trademark-search` | IP Specialist |
-| | `doc_parsing` | `pdf-parser` | Legal Pod, GRC |
-| | `platform_guideline_scraper` | `web-scraper` | Policy Liaison |
-| **品質・監視** | `error_monitoring` | `sentry` | SRE, Resilience Test |
-| | `ui_inspection` | `browserbase` | UX Researcher, HI Auditor |
-| | `vuln_scan` | `snyk` | Security Auditor |
-| | `secret_vault` | `hashicorp-vault` | Security Design |
-| **インフラ** | `cloud_compute` | `aws` | Infra Pod, SRE |
-| | `container_builder` | `docker-mcp` | Infra Lead, DevOps |
-| | `container_orchestration` | `kubernetes` | SRE, Chaos Tester |
-| **連携・共有** | `team_notify_discord` | `discord` | PM, Release Manager |
-| | `team_notify_slack` | `slack` | PMO, PM |
-| | `wiki_management` | `notion` | Scout, Writer |
-| | `enterprise_docs` | `confluence` | Writer, CS |
+**整合の取り方**: スキルが期待する ID（例: `duckduckgo`）を **`--servers` にカタログ名として含める**必要があります。`config.json` のキー（例: `search` = Brave）は Cursor 向け stdio 定義であり、カタログ名と **同一とは限りません**。追加のカタログサーバは `docker mcp catalog` / 公式ドキュメントで名前を確認し、compose の `--servers` を増やしてください。
 
 ---
 
-## 3. セットアップガイド
+## 2. スキルと MCP サーバ ID のマトリクス（40 スキル）
 
-### 3.1 サーバーの起動
-`mcp-gateway` は Docker Compose 経由で起動します。
-```bash
-docker-compose up -d mcp-gateway
-```
+`zeroclaw/config.toml` から取得した対応です（`mcp_server` 列がゲートウェイ側で解決すべき ID）。
 
-### 3.2 認証情報の同期
-`gateway.env` に必要な API キーがすべて設定されていることを確認してください。
-特に `CONTEXT7_API_KEY` と `GITHUB_PERSONAL_ACCESS_TOKEN` がないと、帝国の知能と実行力の 80% が失われます。
+| カテゴリ | スキル名 (`name`) | `mcp_server` |
+|----------|-------------------|--------------|
+| 知能・基盤 | `knowledge_base` | `hexa_rag` |
+| | `logical_reasoning` | `sequential-thinking` |
+| | `time_management` | `time` |
+| 調査・諜報 | `market_research` | `search` |
+| | `academic_research` | `arxiv` |
+| | `web_search` | `duckduckgo` |
+| | `knowledge_base_lookup` | `hexa_rag` |
+| 開発基盤 | `filesystem` | `filesystem` |
+| | `github_api` | `github` |
+| | `code_interpreter` | `python-shell` |
+| | `api_testing` | `curl-executor` |
+| | `api_spec_manager` | `openapi-spec-tool` |
+| 多言語実行 | `runtime_js` | `node-runtime` |
+| | `linter_js` | `eslint-analyzer` |
+| | `runtime_backend` | `polyglot-sandbox` |
+| | `linter_backend` | `backend-analyzer` |
+| | `runtime_php` | `php-runtime` |
+| | `linter_php` | `phpstan-analyzer` |
+| | `runtime_go` | `go-runtime` |
+| | `linter_go` | `golangci-analyzer` |
+| | `runtime_rust` | `rust-runtime` |
+| | `linter_rust` | `clippy-analyzer` |
+| データ・構造 | `db_operation` | `postgres` |
+| | `cache_design` | `redis` |
+| | `diagram_generation` | `mermaid` |
+| ドキュメント・法務 | `doc_parsing` | `pdf-parser` |
+| | `legal_research` | `legal-database-api` |
+| | `ip_search` | `trademark-patent-search` |
+| | `platform_guideline_scraper` | `web-scraper` |
+| 品質・監視 | `error_monitoring` | `sentry` |
+| | `ui_inspection` | `browserbase` |
+| | `vuln_scan` | `snyk` |
+| | `secret_vault` | `hashicorp-vault-mcp` |
+| インフラ | `cloud_compute` | `aws` |
+| | `container_builder` | `docker-mcp` |
+| | `container_orchestration` | `kubernetes` |
+| 連携・共有 | `team_notify_discord` | `discord` |
+| | `team_notify_slack` | `slack` |
+| | `wiki_management` | `notion_snapshots` |
+| | `enterprise_docs` | `confluence_snapshots` |
 
 ---
 
-## 4. 多言語ランタイムの運用 (Polyglot Runtimes)
+## 3. 現行 `mcp/config.json` に含まれるサーバキー
 
-帝国は JS, PHP, Go, Rust を等しく愛します。各ランタイムは隔離されたサンドボックス環境（Docker）で実行されます。
+リポジトリに同梱されているサンプルでは、次の **17** キーのみが定義されています。上表の 40 スキルのうち、ここに無い `mcp_server` は **ゲートウェイにエントリを追加するまでツールとして利用できません**。
 
-- **JS/TS**: `node-runtime` を使用。`package.json` の解析から `npx` による実行まで対応。
-- **PHP**: `php-runtime` を使用。`composer` 連携による依存解決と `phpstan` による静的解析を強制。
-- **Go**: `go-runtime` を使用。並行処理のデッドロック検知を含むテスト実行をサポート。
-- **Rust**: `rust-runtime` を使用。`cargo` ツールチェーンを用い、メモリ安全性をコンパイルレベルで検証。
+| `config.json` のキー | 備考 |
+|----------------------|------|
+| `search` | Brave Search |
+| `github` | `GITHUB_PERSONAL_ACCESS_TOKEN`（ルート `.env` では `GITHUB_PAT` から Compose が注入） |
+| `postgres` | envmcp 経由で DATABASE_URL から生成 |
+| `filesystem` | マウントパスは `args` で指定 |
+| `git` | ローカル git 参照（`mcp/git` を docker で起動。ワークスペースは Compose の bind mount） |
+| `notion_snapshots` | ローカルスナップショット（`./wiki/notion`） |
+| `sequential-thinking` | |
+| `time` | |
+| `arxiv` | |
+| `duckduckgo` | |
+| `hexa_rag` | ローカル RAG（Markdown -> pgvector） |
+| `node-runtime` | ホストの `docker.sock` をゲートウェイから利用 |
+| `polyglot-sandbox` | カスタムイメージ `imperial-polyglot-runner:latest` |
+| `sentry` | |
+| `context7` | `CONTEXT7_API_KEY` |
+| `confluence_snapshots` | ローカルスナップショット（`./wiki/confluence`） |
+| `mermaid` | |
+
+未登録の例: `wikipedia`, `python-shell`, `redis`, `aws`, `kubernetes` など。必要なサーバは [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) や各パッケージの README を参照し、`config.json` に追記してください。
 
 ---
 
-## 5. セキュリティ・ポリシー
+## 4. 起動とファイル配置
 
-1.  **Vault Integration**: 本番環境の認証情報は `secret_vault` (HashiCorp Vault) を経由します。エージェントがプロンプト上に生パスワードを出力することは禁止されています。
-2.  **Safety Sandbox**: すべての `code_interpreter` および `runtime` はネットワーク制限されたコンテナ内で実行されます。
-3.  **Audit Logs**: すべての MCP ツール呼び出しは `storage/postgres` に監査ログとして記録され、`security_auditor` によって常時監視されます。
+- **コンテナイメージ**: Compose では **`docker/mcp-gateway:v2`**（[Docker Hub](https://hub.docker.com/r/docker/mcp-gateway)）を使用します。`mcp/gateway` のような名前は pull できません。
+- **ゲートウェイ**: `docker compose up -d` でコアスタックに含まれます（サービス名 `mcp-gateway`、ポート **8811**）。
+- **マウント**: `./mcp/config.json` をコンテナに読み取り専用で渡します。`/var/run/docker.sock` を渡すため、ホストの Docker と同等の権限になります。
+- **シークレット**: [ENV.md](../ENV.md) に従いルート `.env` を整備してください。`mcp/gateway.env` はテンプレート兼チェックリストです（**既定の Compose では `env_file` として読み込んでいない**点に注意）。
 
 ---
 
-## 6. 技術調査部 (INTEL Pod) による更新
+## 5. 多言語ランタイムとサンドボックス
 
-`tech_trend_scout` および `security_intel_analyst` は、週に一度この MCP レイヤーのツール自体をアップデートする責任を負います。
-新しい MCP サーバーがコミュニティで公開された場合、彼らはまず `legal_risk_simulator` の承認を得た上で、この `README.md` に追記します。
+`node-runtime` や `polyglot-sandbox` はコンテナ内でコマンドを実行します。イメージ名・ボリューム・ネットワーク制限は組織のセキュリティポリシーに合わせて `config.json` を調整してください。PHP / Go / Rust 専用の `mcp_server`（`php-runtime`, `go-runtime` 等）は、現行サンプルには含まれていないため、別途定義が必要です。
+
+---
+
+## 6. セキュリティ上の注意
+
+1. **Vault**: 本番の認証情報はプロンプトに直書きせず、Vault 等の秘密管理と MCP の組み合わせを検討してください。
+2. **docker.sock**: ゲートウェイからホスト Docker を操作できる設定は強い権限です。信頼できるネットワーク・最小権限の原則を適用してください。
+3. **通知系トークン**: Discord / Slack の Bot トークンや Webhook は漏洩リスクが高いため、環境ごとにローテーションし、リポジトリに含めないでください。
+
+---
+
+## 7. メンテナンス
+
+新しい MCP サーバを追加する場合は、(1) `mcp/config.json` にエントリを追加し、(2) 必要な環境変数を [ENV.md](../ENV.md) と `gateway.env.example` に反映し、(3) スキルとして公開するなら `zeroclaw/config.toml` の `[[skills]]` を更新してください。

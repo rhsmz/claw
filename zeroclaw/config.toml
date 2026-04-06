@@ -1,29 +1,48 @@
 # =============================================================================
 # ZeroClaw Enterprise Configuration - The Sovereign 64
 # =============================================================================
+#
+# latest イメージは [llm] / [server] / [[crews]] を無視する。プロバイダはルートまたは ZEROCLAW_PROVIDER。ベース URL は OPENAI_API_URL 等（api_url は無視されるビルドあり）。
+default_provider = "openai"
 
 [server]
 port = 42617
 log_level = "info"
 audit_log = true # 全操作の監査ログを記録
 
-[storage]
-provider = "postgres"
-url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ZEROCLAW_DB_NAME}"
-max_connections = 350 # 64名のエージェントと並列解析プロセスを支える
+# [memory].backend は sqlite | markdown | qdrant | lucid | none（postgres は未対応 → unknown で markdown フォールバックになる）
+[memory]
+backend = "sqlite"
+auto_save = true
+
+# ghcr.io/zeroclaw-labs/zeroclaw の既定ビルドは [memory].backend の postgres を解釈せず警告になる。
+# かつ [storage.provider.config] の provider がメモリ側に取り込まれて "postgres" 扱いになる事例があるため、
+# 公式イメージでは sqlite のみ使用する。Postgres 永続化が必要なカスタムビルドでは公式ドキュメントに従って復元する。
 
 [llm]
 provider = "openai"
 base_url = "http://litellm:4000/v1"
 api_key = "${LITELLM_MASTER_KEY}"
+# Compose の DEFAULT_MODEL（litellm_config.yaml の model_name と一致。例: imperial-logic-high-v1）
 model = "${DEFAULT_MODEL}"
 timeout_sec = 900 # 長大な法務監査や多言語コンパイル時間を考慮
 max_retries = 3
 
 [mcp]
 enabled = true
+# 公式スキーマ: リモート MCP は [[mcp.servers]]。deferred_loading=false でゲートウェイ配下のツールを起動時に登録。
+deferred_loading = false
+
+[[mcp.servers]]
+name = "docker-mcp-gateway"
+transport = "sse"
 url = "http://mcp-gateway:8811/sse"
-tool_timeout_sec = 300
+command = ""
+args = []
+
+[mcp.servers.env]
+
+[mcp.servers.headers]
 
 # =============================================================================
 # 1. 経営・プロダクト戦略部 (Management & Vision: 9名)
@@ -519,165 +538,10 @@ skills = ["filesystem", "github_api", "wiki_management", "diagram_generation", "
 temperature = 0.1
 
 # =============================================================================
-# Skill Definitions (The Sovereign Arsenal - 39 Skills)
+# [skills]（公式）: open-skills 等のグローバル設定。キー名が旧 [[skills]] と衝突するためテーブル配列は使えない。
+# crew の skills = ["market_research", ...] はエージェント用スキル ID。MCP ツールは docker-mcp-gateway 1 本でまとめて提供。
+# 旧 name → mcp_server 対応表は mcp/README.md のマトリクスを参照。
 # =============================================================================
-
-[[skills]]
-name = "knowledge_base"
-mcp_server = "context7" # 過去ログ・社内知見
-
-[[skills]]
-name = "logical_reasoning"
-mcp_server = "sequential-thinking"
-
-[[skills]]
-name = "time_management"
-mcp_server = "time"
-
-[[skills]]
-name = "market_research"
-mcp_server = "brave-search"
-
-[[skills]]
-name = "academic_research"
-mcp_server = "arxiv"
-
-[[skills]]
-name = "web_search"
-mcp_server = "duckduckgo"
-
-[[skills]]
-name = "knowledge_base_lookup"
-mcp_server = "wikipedia"
-
-[[skills]]
-name = "filesystem"
-mcp_server = "filesystem"
-
-[[skills]]
-name = "github_api"
-mcp_server = "github"
-
-[[skills]]
-name = "code_interpreter"
-mcp_server = "python-shell"
-
-[[skills]]
-name = "api_testing"
-mcp_server = "curl-executor"
-
-[[skills]]
-name = "api_spec_manager"
-mcp_server = "openapi-spec-tool"
-
-[[skills]]
-name = "runtime_js"
-mcp_server = "node-runtime"
-
-[[skills]]
-name = "linter_js"
-mcp_server = "eslint-analyzer"
-
-[[skills]]
-name = "runtime_backend"
-mcp_server = "polyglot-sandbox"
-
-[[skills]]
-name = "linter_backend"
-mcp_server = "backend-analyzer"
-
-[[skills]]
-name = "runtime_php"
-mcp_server = "php-runtime"
-
-[[skills]]
-name = "linter_php"
-mcp_server = "phpstan-analyzer"
-
-[[skills]]
-name = "runtime_go"
-mcp_server = "go-runtime"
-
-[[skills]]
-name = "linter_go"
-mcp_server = "golangci-analyzer"
-
-[[skills]]
-name = "runtime_rust"
-mcp_server = "rust-runtime"
-
-[[skills]]
-name = "linter_rust"
-mcp_server = "clippy-analyzer"
-
-[[skills]]
-name = "db_operation"
-mcp_server = "postgres"
-
-[[skills]]
-name = "cache_design"
-mcp_server = "redis"
-
-[[skills]]
-name = "diagram_generation"
-mcp_server = "mermaid-renderer"
-
-[[skills]]
-name = "doc_parsing"
-mcp_server = "pdf-parser"
-
-[[skills]]
-name = "legal_research"
-mcp_server = "legal-database-api"
-
-[[skills]]
-name = "ip_search"
-mcp_server = "trademark-patent-search"
-
-[[skills]]
-name = "platform_guideline_scraper"
-mcp_server = "web-scraper"
-
-[[skills]]
-name = "error_monitoring"
-mcp_server = "sentry"
-
-[[skills]]
-name = "ui_inspection"
-mcp_server = "browserbase"
-
-[[skills]]
-name = "vuln_scan"
-mcp_server = "snyk"
-
-[[skills]]
-name = "secret_vault"
-mcp_server = "hashicorp-vault-mcp"
-
-[[skills]]
-name = "cloud_compute"
-mcp_server = "aws"
-
-[[skills]]
-name = "container_builder"
-mcp_server = "docker-mcp"
-
-[[skills]]
-name = "container_orchestration"
-mcp_server = "kubernetes"
-
-[[skills]]
-name = "team_notify_discord"
-mcp_server = "discord"
-
-[[skills]]
-name = "team_notify_slack"
-mcp_server = "slack"
-
-[[skills]]
-name = "wiki_management"
-mcp_server = "notion"
-
-[[skills]]
-name = "enterprise_docs"
-mcp_server = "confluence"
+[skills]
+open_skills_enabled = false
+prompt_injection_mode = "compact"

@@ -1,0 +1,39 @@
+# WSL2 + Intel GPU: /dev/dri・/dev/dxg・/usr/lib/wsl を渡し、SYCL 対応イメージ（KEEP_SYCL_PLUGIN=1）で起動。
+#
+# Gemma 4 級 + iGPU では SYCL が ~2.3GiB の GPU バッファを確保できず落ちることがある。
+# 既定 RUST_INFERENCE_DISABLE_SYCL_PLUGIN=1 で CPU のみ（安定）。SYCL GPU を試すときは .env で 0。
+# **確実な GPU 推論**は opencl-inference（docker compose --profile opencl-wsl）。
+#
+# ネイティブ Linux は docker-compose.rust-inference-gpu.yml のみ。
+#
+#   docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu-wsl.yml build rust-inference
+#   docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu-wsl.yml up -d --wait
+#
+# /mnt/c/ 上の GGUF は mmap が不安定なため --no-mmap を既定付与。
+services:
+  rust-inference:
+    build:
+      args:
+        KEEP_SYCL_PLUGIN: "1"
+    devices:
+      - /dev/dxg:/dev/dxg
+    volumes:
+      - /dev/dri:/dev/dri
+      - /usr/lib/wsl:/usr/lib/wsl:ro
+    environment:
+      LD_LIBRARY_PATH: /usr/lib/wsl/lib:/app/lib
+      ZES_ENABLE_SYSMAN: "1"
+      RUST_INFERENCE_DISABLE_SYCL_PLUGIN: ${RUST_INFERENCE_DISABLE_SYCL_PLUGIN:-1}
+      ONEAPI_DEVICE_SELECTOR: ${RUST_INFERENCE_WSL_ONEAPI_DEVICE:-opencl:gpu}
+      N_GPU_LAYERS: ${RUST_INFERENCE_GPU_WSL_NGL:--1}
+      LLAMA_EXTRA_ARGS: --no-mmap ${LLAMA_EXTRA_ARGS:-}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 600s

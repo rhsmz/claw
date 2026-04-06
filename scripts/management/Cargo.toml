@@ -22,3 +22,5 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 # HTTP health checks (Status command)
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+# 知識同期: Markdown 走査
+walkdir = "2"
