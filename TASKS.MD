@@ -386,3 +386,7 @@ If unable to complete due to missing critical context:
 - Fixed `team_notify` → `team_notify_discord` in `zeroclaw/config.toml` and affected Read Orders; deprecated alias documented in `skills/team_notify.md`.
 - Removed per-agent scaffold TASKS/work_logs from git; **each crew creates** those artifacts at runtime per `workflow_contract.md` (templates remain under `crew/_template/`).
 - Revised `validation_report_v1.md` with Skill stack / LP / schema checks.
+
+## 関連タスク計画（別ファイル）
+
+- **Rust-first スタック移行・上流代替調査**: [TASKS_RUST_FIRST_STACK.md](TASKS_RUST_FIRST_STACK.md)（Docker / LiteLLM 代替 / 軽量 UI 等。クループロンプト計画とは独立したトラック）

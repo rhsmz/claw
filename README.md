@@ -8,6 +8,7 @@
 |--------------|------|
 | 本 README | 構成・クイックスタート・トラブルシューティング |
 | [ENV.md](ENV.md) | `.env` / `mcp/gateway.env` の変数一覧と運用 |
+| [docs/rust_gateway_openai_requirements.md](docs/rust_gateway_openai_requirements.md) | Rust 薄型 LLM ゲートウェイ（OpenAI 互換要件・LiteLLM 機能の要否） |
 | [mcp/README.md](mcp/README.md) | MCP Gateway・40 スキルと `config.json` の対応・カタログ拡張 |
 | [Taskfile.yml](Taskfile.yml) | `task` コマンド（`task --list-all` で説明表示） |
 
@@ -45,26 +46,31 @@ flowchart LR
 | [PostgreSQL + pgvector](https://github.com/pgvector/pgvector) | アプリ DB・ベクトル拡張 | 5432 |
 | rust-inference（`rust-inference/` の Dockerfile） | llama.cpp SYCL・OpenAI 互換 `llama-server` | コンテナ内 8080／ホストは `.env` の `RUST_INFERENCE_HOST_PORT`（既定 9080） |
 | [LiteLLM](https://docs.litellm.ai/) | OpenAI 互換ゲートウェイ・モデルルーティング・Langfuse 連携 | 4000 |
+| **llm-gateway-rust**（`llm-gateway-proxy/`、`--profile rust-gateway`） | Axum 製の薄型 OpenAI プロキシ（LiteLLM 代替 PoC）。要件は [docs/rust_gateway_openai_requirements.md](docs/rust_gateway_openai_requirements.md) | ホストは `.env` の `LLM_GATEWAY_RUST_HOST_PORT`（既定 4100） |
 | [Langfuse](https://langfuse.com/)（v3 イメージ、`--profile ui`） | トレース・分析 | 3000 |
 | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | Rust 製エージェントランタイム | `.env` の `ZEROCLAW_GATEWAY_PORT`（例: 42617） |
 | [Docker MCP Gateway](https://github.com/docker/mcp-gateway) | MCP サーバのオーケストレーション | 8811 |
 | Stack Portal（`nginx:alpine`・`stack-portal/`） | ZeroClaw / LiteLLM / Open WebUI 等へのジャンプページ | `.env` の `STACK_PORTAL_PORT`（既定 8042） |
+| [Llumen](https://github.com/pinkfuwa/llumen)（`--profile ui-llumen`） | 軽量 Rust チャット UI（OpenAI 互換 API） | `.env` の `LLUMEN_HOST_PORT`（既定 8079） |
 | [Open WebUI](https://openwebui.com/)（`--profile ui`） | チャット UI・RAG 等 | 8080 |
 
 ### Docker Compose（本リポジトリの現状）
 
 - **Compose ファイル**は V2 形式です（トップレベル `version` は未使用）。プロジェクト名は **`name: zeroclaw-enterprise`** で固定しています。CLI は **`docker compose`**（ハイフン無し）を想定しています（`task` からも同様）。
-- **既定の `task up`** では **PostgreSQL・Redis・rust-inference・LiteLLM・MCP Gateway・Stack Portal（既定 :8042）** を起動します。`rust-inference` は **Intel GPU + Linux ホストまたは WSL2**（`/dev/dri` マウント）で SYCL 推論を想定しています。**GGUF モデル**を `.env` の `RUST_INFERENCE_MODELS_DIR`（既定 `./storage/rust-inference-models`）に配置しないと `rust-inference` のヘルスチェックが通らず、LiteLLM も起動待ちで止まります。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、`task up` は **`docker compose up -d --wait`** でヘルス待ちします（Compose v2.29+ 推奨）。`litellm_config.yaml` のローカルモデルは **`http://rust-inference:8080/v1`** を向けます。
+- **既定の `task up`** では **PostgreSQL・Redis・rust-inference・LiteLLM・MCP Gateway・Stack Portal（既定 :8042）** を起動します。`rust-inference` は **Intel oneAPI（SYCL）** ビルドです。**ネイティブ Linux で GPU を使う**ときは `docker-compose.rust-inference-gpu.yml` を併用して `/dev/dri` を渡してください。**WSL2 + Intel** では **`docker-compose.rust-inference-gpu-wsl.yml`** と **`task rust-inference-gpu-wsl`**（デバイス・`/usr/lib/wsl` 渡し＋ SYCL 付きビルド）でスタックを安定起動できます。大型 GGUF では **SYCL が iGPU に ~2.3GiB 単位で確保できず落ちる**ことがあるため、compose 既定は **`RUST_INFERENCE_DISABLE_SYCL_PLUGIN=1`（CPU のみ）** です。**WSL での GPU 推論**は **`opencl-inference`**（**`task up-with-opencl-wsl`**）を推奨します。SYCL GPU を試す場合は同変数を **`0`** にしてください。**GGUF モデル**を `.env` の `RUST_INFERENCE_MODELS_DIR`（既定 `./storage/rust-inference-models`）に配置しないと `rust-inference` のヘルスチェックが通らず、LiteLLM も起動待ちで止まります。各サービスに **`restart: unless-stopped`** と **ヘルスチェック**があり、`task up` は **`docker compose up -d --wait`** でヘルス待ちします（Compose v2.29+ 推奨）。`litellm_config.yaml` のローカルモデルは **`http://rust-inference:8080/v1`** を向けます。
+- **Llumen（:8079 既定）** は **プロファイル `ui-llumen`** で任意起動します（**[ghcr.io/pinkfuwa/llumen](https://github.com/pinkfuwa/llumen)**）。`API_KEY` に `LITELLM_MASTER_KEY`、`API_BASE` に既定で LiteLLM（`LLUMEN_OPENAI_BASE` で `llm-gateway-rust` へ切替可）を渡します。例: **`task up-with-llumen`**（コアスタック起動後）。初回ログインは公式 README を参照してください。
 - **Open WebUI（:8080）と Langfuse（:3000）** は **プロファイル `ui`** で起動します（ClickHouse / MinIO / Langfuse 専用 Redis を同梱）。初回はイメージ取得と DB マイグレーションで **数分**かかることがあります。例: `docker compose --profile ui up -d` または **`task up-with-ui`**。`.env` の `OPEN_WEBUI_SECRET_KEY` と `LANGFUSE_*`（`LANGFUSE_ENCRYPTION_KEY` は `openssl rand -hex 32` 推奨）を起動前に変更してください。
+- **Rust 薄型 LLM ゲートウェイ**（**`docker compose --profile rust-gateway`**）は **`llm-gateway-rust`** を追加し、`rust-inference:8080/v1` へモデル名エイリアス付きで中継します。ビルド: `task build-llm-gateway-rust`。Open WebUI / ZeroClaw のベース URL を **`http://llm-gateway-rust:4100/v1`** に切り替えたときのみ LiteLLM を経由しません（同一 `LITELLM_MASTER_KEY` を Bearer に使用）。
+- **WSL2 + OpenCL**（**`docker compose --profile opencl-wsl`**）は **`opencl-inference`**（llama.cpp **GGML OpenCL**、`intel-opencl-icd`）を **`9081` ホスト既定**で追加します。コンテナへ **ボリュームで `/dev/dri`**、**`devices` で `/dev/dxg`**、**`/usr/lib/wsl` ディレクトリ全体（read-only）** を渡します（Intel 系ドライバは **dxcore** 列挙のため **`/usr/lib/wsl/lib` 単体マウントでは GPU が出ない**ことがある。根拠: [intel/compute-runtime#625](https://github.com/intel/compute-runtime/issues/625)）。診断は **`bash scripts/debug-opencl-container.sh`**（`rust-inference` の GPU オーバーライドと同じく **`/dev/dri` はディレクトリ bind**）。**ホストは WSL の Linux 側**です。Windows 本体に `/dev/dri` は無く、**WSL ゲスト内で `ls /dev/dri` が通ること**が前提です。カーネル 6.6 系などで **`/dev/dri` が無い**ときは、リポジトリ同梱の **WSL2 + Intel Arc + `/dev/dri` 構成ガイド**（`WSL2環境下におけるIntel Arc GPUのパススルーと…実装ガイド.md`）のとおり **`sudo modprobe vgem`** で仮想 DRM ノードを出し、永続化するなら **`/etc/modules` に `vgem`** を追記してください。`render` / `video` グループはホストユーザー向け（コンテナが root なら通常不要）。確認: **`bash scripts/check-wsl-intel-gpu.sh`**。**Docker より先に** WSL 側で GPU ノードを用意する場合は **`task wsl-setup-gpu`**（または WSL 内で **`bash scripts/wsl-setup-gpu.sh`**。`sudo modprobe vgem` を実行）。再起動後も自動で vgem を載せる場合は **`PERSIST_VGEM=1 task wsl-setup-gpu`**（Windows PowerShell では **`$env:PERSIST_VGEM='1'; task wsl-setup-gpu`**）。`litellm_config.yaml` の **`imperial-*-wsl-oc`** → **`http://opencl-inference:8080/v1`**。手順の流れ: **`task wsl-setup-gpu`** → `task build-opencl-inference` → **`task up-with-opencl-wsl`** → `.env` の **`DEFAULT_MODEL=imperial-logic-high-wsl-oc`** 等。**`/dev/dri` が無いまま `up` すると bind マウントで失敗**することがあります。ネイティブ Linux では `/usr/lib/wsl/lib` が無いためこのプロファイルは想定外です。
 - **ZeroClaw** は **`ghcr.io/zeroclaw-labs/zeroclaw:latest`** を **プロファイル `zeroclaw`** で任意起動します。公式デプロイに合わせ **`zeroclaw_data` ボリューム**（`/zeroclaw-data`）にワークスペースを保持し、**`zeroclaw/config.toml` を `.../.zeroclaw/config.toml` に read-only マウント**します。`[[crews]]` を含む本リポジトリの設定は OSS 版と完全には一致しない可能性があるため、起動しない場合は `zeroclaw doctor` / ログで照合してください。起動例: `docker compose --profile zeroclaw up -d` または `task up-with-zeroclaw`。
-- 初回は **GGUF を上記ディレクトリへ手動で配置**し、`docker compose build rust-inference`（初回のみビルドが非常に重い）のあと `task up` してください。配置場所のヒント: `task rust-inference-models-hint`。
+- 初回は **GGUF を上記ディレクトリへ手動で配置**し、`task build-rust-inference`（初回のみビルドが非常に重い）のあと `task up` してください。手順の要約: `task help-stack`。配置場所: `task models-hint`（`rust-inference-models-hint` と同じ）。
 - **Task** は [dotenv](https://taskfile.dev/docs/guide/#dotenv-files) でルートの `.env` を読み込みます（`sync` / `audit` / `command` 等で変数が使えます）。`desc` に `[Rust]` のような角括弧がある場合は YAML 上クォートが必要なため、Taskfile では文字列としてエスケープ済みです。
 
 ## 前提条件
 
   - [Docker](https://docs.docker.com/get-docker/) および [Docker Compose V2](https://docs.docker.com/compose/)（`docker compose` サブコマンドが使えること）
   - （任意）[Task](https://taskfile.dev/installation/)（`Taskfile.yml` のタスクを使う場合）
-  - **Intel GPU（推奨）**: Linux または WSL2 でホストドライバと `/dev/dri` をコンテナへ渡せる構成。CPU のみでは極めて遅い場合があります。`docker-compose.yml` の `devices: /dev/dri` は **Windows ネイティブ Docker では動かない**ことがあります（WSL2 バックエンドを推奨）。
+  - **Intel GPU（推奨）**: 既定イメージは **CPU 動的バックエンドのみ**（`libggml-sycl` を除外）です。**WSL2** では **`task rust-inference-gpu-wsl`** でデバイス付き compose を使えますが、**GPU 推論**は **`task up-with-opencl-wsl`**（`opencl-inference`）が確実です。**WSL 内で `ls -la /dev/dri` と `/dev/dxg`** を確認してください。**ネイティブ Linux** では `docker-compose.rust-inference-gpu.yml` を併用し、**`/dev/dri` をボリュームマウント**したうえで **`rust-inference` を再ビルド**（`KEEP_SYCL_PLUGIN=1`）してから同じ `-f` ペアで `up` してください。`.env` の `ONEAPI_DEVICE_SELECTOR`（既定 `level_zero:gpu`）は空にしないでください。不調時は `opencl:gpu` を試してください。以降の `docker compose` も **GPU 用に選んだ `-f` ペアを揃える**こと（手動なら `COMPOSE_FILE=docker-compose.yml:docker-compose.rust-inference-gpu-wsl.yml` も可）。`rust-inference-gpu-wsl` 既定の CPU や CPU のみイメージでは遅い場合があります。
 
 ## クイックスタート
 
@@ -110,9 +116,16 @@ docker compose config --quiet
 docker compose up -d --wait
 ```
 
+### 3b. `task test-smoke` を成功させるまで
+
+1. **Docker Desktop**（または Engine）を起動し、CLI で `docker info` の **Server** セクションがエラーなく表示されることを確認する。
+2. **GGUF** を `storage/rust-inference-models/`（または `.env` の `RUST_INFERENCE_MODELS_DIR`）へ置き、**`task up`** が完了して `rust-inference` と `LiteLLM` が healthy になるまで待つ（初回は `task build-rust-inference` が必要な場合あり）。
+3. リポジトリルートで **`task test-smoke`** を実行する。**コア**（スタックポータル・LiteLLM liveness・rust-inference `/health`・MCP :8811）がすべて OK なら **終了コード 0**。`rust-gateway` / ZeroClaw / Llumen / Open WebUI / Langfuse は **未起動でも SKIP** 扱いで成功に含められる。
+4. これら **profile 系もすべて応答必須**にする場合は、該当サービスを起動したうえで **`task test-smoke-strict`** を使う（環境変数 `STACK_SMOKE_STRICT=1` と同等）。
+
 ### 4\. モデル（GGUF）の配置
 
-1. [Hugging Face](https://huggingface.co/models?library=gguf) 等から **GGUF** をダウンロードし、`storage/rust-inference-models/`（または `.env` の `RUST_INFERENCE_MODELS_DIR`）へ置きます。複数ある場合はファイル名昇順で最初の `.gguf` が選ばれます。特定ファイルだけ使う場合は `.env` で `LLAMA_MODEL_PATH=/app/models/YourModel.gguf` のように **コンテナ内パス**を指定します。
+1. [Hugging Face](https://huggingface.co/models?library=gguf) 等から **GGUF** をダウンロードし、`storage/rust-inference-models/`（または `.env` の `RUST_INFERENCE_MODELS_DIR`）へ置きます。例: [ggml-org/gemma-4-E2B-it-GGUF](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/tree/main)（`Q8_0` 約 5GB、`f16` 約 9.3GB、`mmproj` 約 1GB）。**自動取得**（リポジトリルート・`huggingface_hub` 使用）: Q8 のみなら **`task models-download-gemma4-e2b-q8`** または `scripts/download-hf-gguf.ps1` / `.sh`。**3 つまとめて**なら **`task models-download-gemma4-e2b-all`** または `powershell -File scripts/download-hf-gguf.ps1 -All` / `ALL=1 bash scripts/download-hf-gguf.sh`（合計約 15GB 級・時間がかかります）。複数 `.gguf` があるとファイル名昇順で最初の 1 本が自動選択されます（このセットでは通常 `gemma-4-e2b-it-Q8_0.gguf`）。**F16 を推論に使う**など別ファイルにしたい場合は `.env` で `LLAMA_MODEL_PATH=/app/models/gemma-4-e2b-it-f16.gguf` のように **コンテナ内パス**を明示してください。
 2. **`.env` の `DEFAULT_MODEL`** を `litellm_config.yaml` の `model_list[].model_name` のいずれか（例: `imperial-logic-high-v1`）と一致させます。
 3. `llama-server` が受け付ける OpenAI 互換の `model` 名は `litellm_config.yaml` の `litellm_params.model`（既定 `openai/gpt-3.5-turbo`）で調整できます。
 
@@ -125,6 +138,7 @@ Ollama を廃止したため、**hexa-vector.config.json** で想定していた
 | 用途 | URL | 備考 |
 |------|-----|------|
 | Stack Portal（リンク集） | http://localhost:8042 | **`task up`** で起動。ZeroClaw 公式ダッシュボード等へジャンプ（ポートは `STACK_PORTAL_PORT` で変更可） |
+| Llumen | http://localhost:8079（既定） | **`task up-with-llumen`**（`--profile ui-llumen`）後に表示 |
 | Open WebUI | http://localhost:8080 | **`task up-with-ui`**（`--profile ui`）後に表示 |
 | Langfuse | http://localhost:3000 | 同上。MinIO コンソールは http://localhost:9091（127.0.0.1 のみ公開） |
 | LiteLLM（OpenAI 互換ベース） | http://localhost:4000 | コアスタックの `task up` で起動 |
@@ -145,22 +159,28 @@ ZeroClaw の公式 Web ダッシュボードは **`task up-with-zeroclaw`** 後�
 | タスク | 概要 |
 |--------|------|
 | `task` | タスク一覧表示 |
-| `task setup` | 初回準備（`.env` / `gateway.env`・`wiki/notion` 等のディレクトリ） |
+| `task setup` | 初回準備（OS に応じて Unix または Windows スクリプト） |
+| `task setup-wsl` | **WSL / Linux 専用**（`powershell` を呼ばない。`/mnt/c/...` 上のリポジトリでも利用可） |
 | `task up` / `task down` | コアスタックの起動・停止（rust-inference を含む） |
 | `task ps` / `task status` | `docker compose ps` |
 | `task logs` / `task logs-mcp` / `task logs-ui` / `task logs-zeroclaw` | サービス別ログ追跡 |
+| `task up-with-llumen` | Llumen（8079 既定）（`--profile ui-llumen`） |
 | `task up-with-ui` | Open WebUI（8080）・Langfuse（3000）（`--profile ui`） |
 | `task up-with-zeroclaw` | ZeroClaw を追加（`--profile zeroclaw`） |
 | `task up-full` | コア + UI + ZeroClaw を一括（`--profile ui --profile zeroclaw`） |
 | `task config` / `task compose-validate` | `docker compose config --quiet` |
 | `task pull` | `docker compose pull`（イメージ更新取得） |
 | `task down-volumes` | ボリュームごと削除（**データ全消去**・確認プロンプトあり） |
-| `task rust-inference-models-hint` | GGUF 配置パスのリマインダ |
+| `task help-stack` | 初回起動（GGUF・ビルド・`up`）の流れを表示 |
+| `task build-rust-inference` / `task rebuild-rust-inference` | rust-inference イメージの build / `--no-cache` 再ビルド（CPU 既定） |
+| `task rust-inference-gpu-wsl` / `task build-rust-inference-gpu-wsl` / `task up-with-rust-inference-gpu-wsl` | **WSL2 + Intel**：SYCL 付きビルド＋`/dev/dri`・`/usr/lib/wsl` 等（既定は **CPU**、`RUST_INFERENCE_DISABLE_SYCL_PLUGIN`）。**GPU 推論**は `task up-with-opencl-wsl` |
+| `task models-hint` | GGUF 配置のリマインダ（`rust-inference-models-hint` と同じ） |
 | `task hexa-rag-models-hint` / `task rag-ingest` | hexa RAG のモデル方針メモ・ingest |
 | `task logs-rust-inference` | rust-inference のログ |
 | `task mcp-sync` | `mcp-gateway` 再起動 |
-| `task test` | `docker compose config` + `cargo test`（`scripts/management`） |
-| `task test-smoke` | 公開ポートの HTTP/TCP スモーク（**スタック起動後**・WSL/macOS/Linux で `bash` 利用可） |
+| `task test` | `docker compose config` と **management / llm-gateway-proxy / rust-inference** の `cargo test` / `check` |
+| `task test-smoke` | **コア**疎通（ポータル・LiteLLM・rust-inference・MCP）。`rust-gateway` / ZeroClaw / Llumen / Open WebUI / Langfuse は **未起動なら SKIP** で成功扱い |
+| `task test-smoke-strict` | 上記を **すべて必須**（`STACK_SMOKE_STRICT=1`）。全 profile 起動済みで使う |
 
 ## 設定ファイル
 
@@ -223,11 +243,16 @@ Open WebUI は LiteLLM（ポート 4000）を OpenAI 互換エンドポイント
 
   - **MCP のサーバ名が合わない** `zeroclaw/config.toml` の各スキルの `mcp_server` と、`mcp/config.json` のキー名が一致している必要があります（例: 調査系は `search`）。起動失敗やツールが出ない場合は [Docker MCP カタログ](https://desktop.docker.com/mcp/catalog/v2/catalog.yaml) または `docker mcp` CLI で実名を確認し、`config.json` を修正してください。
 
-  - **ポートが既に使われている** 5432 / 3000 / 4000 / 8080 / 8811 / 9080（rust-inference 既定）/ ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。**PostgreSQL** は `.env` の **`POSTGRES_HOST_PORT`**（既定 `5432`）でホスト側ポートを変えられます（例: `5433`。コンテナ同士の接続は引き続き `postgres:5432`）。**rust-inference のホスト公開**は `RUST_INFERENCE_HOST_PORT` で変更できます。
+  - **ポートが既に使われている** 5432 / 3000 / 4000 / 8079（Llumen 既定）/ 8080 / 8811 / 9080（rust-inference 既定）/ ZeroClaw 用ポートがホストで占有されているとバインドに失敗します。**PostgreSQL** は `.env` の **`POSTGRES_HOST_PORT`**（既定 `5432`）でホスト側ポートを変えられます（例: `5433`。コンテナ同士の接続は引き続き `postgres:5432`）。**rust-inference のホスト公開**は `RUST_INFERENCE_HOST_PORT` で変更できます。
 
-  - **rust-inference のビルド失敗・イメージ pull 失敗** `intel/deep-learning-essentials` のタグは `.env` の `RUST_INFERENCE_ONEAPI_VERSION` で上書き可能です。llama.cpp のタグは `LLAMA_CPP_REF`（既定 `b5377`）です。[llama.cpp SYCL ドキュメント](https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/SYCL.md) を参照してください。
+  - **Docker ビルド／pull で `error getting credentials`（`load metadata for docker.io/library/ubuntu:24.04` 等）** 公開イメージでも **`~/.docker/config.json` の `credsStore`**（例: `desktop` / `pass`）が **壊れた `docker-credential-*` を起動して exit 1** になることがあります（**WSL のシェルから `docker compose build` する場合に多い**）。**対処**: WSL 内で **`bash scripts/docker-wsl-fix-creds-store.sh`**（`config.json` を時刻付きバックアップのうえ `credsStore` と Hub 向け `credHelpers` を除去）。または手動で当該キーを削除。Docker Desktop 利用時は **Settings → Resources → WSL integration** も確認。**別原因**: 旧 Dockerfile の `# syntax=docker/dockerfile:1` は本リポジトリでは削除済み。再発時は `docker compose build --no-cache`。
+  - **rust-inference のビルド失敗・イメージ pull 失敗** `intel/deep-learning-essentials` のタグは `.env` の `RUST_INFERENCE_ONEAPI_VERSION` で上書き可能です。llama.cpp の参照は `LLAMA_CPP_REF`（既定 `master`。Gemma 4 等は新しめの参照が必要）です。[llama.cpp SYCL ドキュメント](https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/SYCL.md) を参照してください。
 
-  - **`/dev/dri` 関連で compose が失敗する（Windows ネイティブ Docker 等）** Intel GPU パススルーが使えない環境では、`docker-compose.yml` の `rust-inference.devices` を一時的にコメントアウトするか、**Docker Desktop の WSL2 バックエンド**で Linux 側に GPU を公開できる構成へ切り替えてください（CPU フォールバックは極めて遅い場合があります）。
+  - **WSL + Intel GPU の状態確認** **`task wsl-check-intel-gpu`**（WSL 内の `task` または Windows の `task` どちらでも可）で `/dev/dri`・`/dev/dxg`・`clinfo`・**Docker への繋ぎ込みコマンド**を一覧します。事前に `/dev/dri` が無い場合は **`task wsl-setup-gpu`**。**Docker コンテナ内で GPU が見えているか**は WSL 内で **`task check-docker-gpu`**（`bash scripts/check-docker-gpu.sh`）。
+
+  - **Intel Community（/dev/dri が WSL2 に無い）** [Cannot get /dev/dri to appear in WSL 2…](https://community.intel.com/t5/Graphics/Cannot-get-dev-dri-to-appear-in-WSL-2-for-Intel-Iris-Xe-12th-Gen/td-p/1724203) では、WSL2 では **`/dev/dxg` を確認する**こと、**`wsl --update` / `wsl --version`**、**`.wslconfig` の `[wsl2]` で `nestedVirtualization=true` の確認**、Docker では **`--device /dev/dxg`** を使う案内があります（QSV / Jellyfin 向けの文脈）。**本リポジトリの実験用オーバーライド:** `docker-compose.rust-inference-gpu-wsl.yml`（**`devices: /dev/dxg`**、**`/usr/lib/wsl` ツリー read-only**、**`LD_LIBRARY_PATH=/usr/lib/wsl/lib:/app/lib`**、`KEEP_SYCL_PLUGIN=1`）。**llama SYCL がコンテナ内で必ず動く保証はない**ため、失敗時は従来どおり CPU イメージか `/dev/dri` が得られる環境を検討してください。
+
+  - **`/dev/dri` 関連で compose が失敗する** ネイティブ Linux や DRM が揃う WSL では `docker-compose.rust-inference-gpu.yml` を併用します（**`/dev/dri` はボリュームマウント**）。**WSL2 の別パス**: Windows 側で GPU が見えていても、WSL には **`/dev/dxg`**（D3D ブリッジ）だけがあり **`/dev/dri`（DRM）が無い**ことがあります。`ls -la /dev/dxg` で確認できます。**本リポジトリの rust-inference（SYCL / Level Zero）は Linux DRM の `/dev/dri` を前提**にしているため、`/dev/dxg` だけではそのまま置き換えできません（実験として **`docker-compose.rust-inference-gpu-wsl.yml`** あり。上記 Intel Community スレッド参照）。`/dev/dri` を出すには [Intel: Configure WSL 2 for GPU Workflows](https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2024-2/configure-wsl-2-for-gpu-workflows.html) の手順（WSL 内のランタイム・カーネル／ドライバ整合）を参照してください。ネイティブ Linux では `card0` / `renderD*` が `/dev/dri` に現れます。`ONEAPI_DEVICE_SELECTOR` は **空にしない**（既定 `level_zero:gpu`。不調なら `.env` で `opencl:gpu` など）。[Intel LLVM EnvironmentVariables（ONEAPI_DEVICE_SELECTOR）](https://intel.github.io/llvm/EnvironmentVariables.html) を参照してください。
 
   - **推論が 404 / model not found** `DEFAULT_MODEL`・`litellm_config.yaml` の `model_name`・実際にマウントした GGUF（`LLAMA_MODEL_PATH` またはディレクトリ内の先頭 `.gguf`）を確認してください。
 

@@ -1,0 +1,18 @@
+[package]
+name = "llm-gateway-proxy"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal OpenAI-compatible proxy: model aliases -> rust-inference (llama-server)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+axum = "0.8"
+bytes = "1"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

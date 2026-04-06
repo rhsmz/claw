@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
-# oneAPI ランタイム（SYCL / Level Zero）
+# oneAPI ランタイム（SYCL / Level Zero）。setvars が未定義変数を参照するため nounset は使わない。
 # shellcheck source=/dev/null
 source /opt/intel/oneapi/setvars.sh --force
+
+# WSL + Intel iGPU 等で libggml-sycl が大型テンソルを GPU に載せられず落ちる場合、
+# RUST_INFERENCE_DISABLE_SYCL_PLUGIN=1 でプラグインを外し CPU のみで起動する（同一イメージのまま）。
+if [[ "${RUST_INFERENCE_DISABLE_SYCL_PLUGIN:-}" == "1" ]]; then
+  echo "rust-inference: RUST_INFERENCE_DISABLE_SYCL_PLUGIN=1 — libggml-sycl を読み込まず CPU バックエンドのみ" >&2
+  rm -f /app/lib/libggml-sycl.so /app/lib/libggml-sycl.so.* 2>/dev/null || true
+fi
 
 MODEL="${LLAMA_MODEL_PATH:-}"
 if [[ -z "${MODEL}" ]]; then

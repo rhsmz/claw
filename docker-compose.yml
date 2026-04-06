@@ -1,7 +1,10 @@
 # Compose V2 形式（version キーは不要）。
 # 既定: Postgres / Redis / rust-inference（llama.cpp SYCL）/ LiteLLM / MCP Gateway / Stack Portal（既定 :8042）
 # Web UI（Open WebUI :8080 / Langfuse :3000）: docker compose --profile ui up -d
+# 軽量 Rust UI（Llumen :8079 既定）: docker compose --profile ui-llumen up -d
 # ZeroClaw: docker compose --profile zeroclaw up -d
+# Rust 薄型 LLM ゲートウェイ（LiteLLM 代替 PoC）: docker compose --profile rust-gateway up -d
+# WSL2 + OpenCL（/dev/dxg・/dev/dri・/usr/lib/wsl/lib）: docker compose --profile opencl-wsl up -d（task up-with-opencl-wsl）
 # rust-inference: Intel GPU は Linux ホストまたは WSL2 で /dev/dri をマウント。モデルは RUST_INFERENCE_MODELS_DIR に .gguf を配置。
 # 参考: https://docs.docker.com/compose/ / ZeroClaw deployment（公式イメージ・設定マウント）
 
@@ -47,20 +50,21 @@ services:
       context: ./rust-inference
       args:
         ONEAPI_VERSION: ${RUST_INFERENCE_ONEAPI_VERSION:-2025.3.2-0-devel-ubuntu24.04}
-        LLAMA_CPP_REF: ${LLAMA_CPP_REF:-b5377}
+        LLAMA_CPP_REF: ${LLAMA_CPP_REF:-master}
         GGML_SYCL_F16: ${GGML_SYCL_F16:-OFF}
+        KEEP_SYCL_PLUGIN: ${RUST_INFERENCE_KEEP_SYCL:-0}
     restart: unless-stopped
     init: true
     ports:
       - "${RUST_INFERENCE_HOST_PORT:-9080}:8080"
     volumes:
       - ${RUST_INFERENCE_MODELS_DIR:-./storage/rust-inference-models}:/app/models:ro
-    devices:
-      - /dev/dri:/dev/dri
+    # Intel iGPU 透過は docker-compose.rust-inference-gpu.yml を併用（ホストに /dev/dri がある場合）
     environment:
       LLAMA_MODEL_PATH: ${LLAMA_MODEL_PATH:-}
       N_GPU_LAYERS: ${N_GPU_LAYERS:--1}
-      ONEAPI_DEVICE_SELECTOR: ${ONEAPI_DEVICE_SELECTOR:-}
+      # SYCL 利用時は空にできない。GPU compose では opencl:gpu 等へ上書き可（.env / オーバーライド参照）
+      ONEAPI_DEVICE_SELECTOR: ${ONEAPI_DEVICE_SELECTOR:-level_zero:gpu}
       LLAMA_EXTRA_ARGS: ${LLAMA_EXTRA_ARGS:-}
     healthcheck:
       test:
@@ -72,6 +76,71 @@ services:
       timeout: 5s
       retries: 5
       start_period: 180s
+
+  # llama-server（GGML OpenCL）— WSL2: Intel 公式に従い dxcore 用に /usr/lib/wsl 全体をマウント（lib だけでは GPU が列挙されないことがある: intel/compute-runtime#625）。
+  # /dev/dxg 必須。/dev/dri は vgem 等のダミーでも可だが、OpenCL の GPU 検出は主に dxcore（上記マウント）側。
+  # LiteLLM では model_name imperial-*-wsl-oc → http://opencl-inference:8080/v1（.env の DEFAULT_MODEL を合わせる）
+  opencl-inference:
+    profiles: ["opencl-wsl"]
+    build:
+      context: ./opencl-inference
+      args:
+        LLAMA_CPP_REF: ${LLAMA_CPP_REF:-master}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${OPENCL_INFERENCE_HOST_PORT:-9081}:8080"
+    volumes:
+      - ${RUST_INFERENCE_MODELS_DIR:-./storage/rust-inference-models}:/app/models:ro
+      # WSL ゲストのツリーごと（/usr/lib/wsl/lib 単体マウントでは clGetPlatformIDs が 0 になりやすい）
+      - /usr/lib/wsl:/usr/lib/wsl:ro
+      # rust-inference GPU と同様、ディレクトリは bind（devices ではなく volumes）
+      - /dev/dri:/dev/dri
+    devices:
+      - /dev/dxg:/dev/dxg
+    environment:
+      # dxcore 等は /usr/lib/wsl/lib を先に（Intel WSL+Docker 推奨パス順に近づける）
+      LD_LIBRARY_PATH: /usr/lib/wsl/lib:/app:/app/lib
+      LLAMA_MODEL_PATH: ${LLAMA_MODEL_PATH:-}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:--1}
+      LLAMA_EXTRA_ARGS: ${LLAMA_EXTRA_ARGS:-}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+
+  # Axum 製の最小 OpenAI 互換プロキシ（モデル名エイリアス → llama-server）。LiteLLM と併用可。
+  llm-gateway-rust:
+    profiles: ["rust-gateway"]
+    build:
+      context: ./llm-gateway-proxy
+    restart: unless-stopped
+    init: true
+    depends_on:
+      rust-inference:
+        condition: service_healthy
+    ports:
+      - "${LLM_GATEWAY_RUST_HOST_PORT:-4100}:4100"
+    environment:
+      BIND_ADDR: 0.0.0.0:4100
+      UPSTREAM_OPENAI_BASE: http://rust-inference:8080/v1
+      OPENAI_COMPAT_MODEL: openai/gpt-3.5-turbo
+      UPSTREAM_API_KEY: dummy-key
+      GATEWAY_API_KEY: ${LITELLM_MASTER_KEY}
+      MODEL_ALIASES: imperial-logic-high-v1,imperial-build-knight-v1,imperial-scout-mini-v1
+    healthcheck:
+      test:
+        ["CMD", "curl", "-fsS", "http://127.0.0.1:4100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
@@ -129,6 +198,28 @@ services:
       - "${STACK_PORTAL_PORT:-8042}:80"
     volumes:
       - ./stack-portal:/usr/share/nginx/html:ro
+
+  # ---------------------------------------------------------------------------
+  # 軽量チャット UI（プロファイル ui-llumen）— Llumen（Rust / OpenAI 互換）
+  # 既定 API は LiteLLM。Rust ゲートウェイ経由にする場合は LLUMEN_OPENAI_BASE を参照。
+  # ---------------------------------------------------------------------------
+  llumen:
+    profiles: ["ui-llumen"]
+    image: ghcr.io/pinkfuwa/llumen:latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      litellm:
+        condition: service_healthy
+    ports:
+      - "${LLUMEN_HOST_PORT:-8079}:80"
+    environment:
+      API_KEY: ${LITELLM_MASTER_KEY}
+      API_BASE: ${LLUMEN_OPENAI_BASE:-http://litellm:4000/v1}
+      BIND_ADDR: "0.0.0.0:80"
+      DATA_PATH: /data
+    volumes:
+      - llumen_data:/data
 
   # ---------------------------------------------------------------------------
   # Web UI（プロファイル ui）— postgres-init で openwebui_db / langfuse_db を作成済み
@@ -380,6 +471,7 @@ volumes:
   postgres_data:
   zeroclaw_data:
   litellm_migrations:
+  llumen_data:
   open_webui_data:
   langfuse_redis_data:
   langfuse_clickhouse_data:

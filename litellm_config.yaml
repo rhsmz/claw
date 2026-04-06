@@ -29,6 +29,32 @@ model_list:
       api_key: dummy-key
       timeout: 120
 
+  # ---------------------------------------------------------------------------
+  # WSL2 + OpenCL（opencl-inference。/dev/dxg + /dev/dri + /usr/lib/wsl ツリー全体マウント推奨: intel/compute-runtime#625）
+  # ---------------------------------------------------------------------------
+  - model_name: imperial-logic-high-wsl-oc
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_base: http://opencl-inference:8080/v1
+      api_key: dummy-key
+      timeout: 300
+      tpm: 100000
+      rpm: 1000
+
+  - model_name: imperial-build-knight-wsl-oc
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_base: http://opencl-inference:8080/v1
+      api_key: dummy-key
+      timeout: 600
+
+  - model_name: imperial-scout-mini-wsl-oc
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_base: http://opencl-inference:8080/v1
+      api_key: dummy-key
+      timeout: 120
+
   # .env の DEFAULT_MODEL は上記のいずれかの model_name と一致させる（例: imperial-logic-high-v1）。
   # model_list に無い名前は OpenAI 互換パススルーになり、意図しない 401 になり得る。
 

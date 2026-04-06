@@ -133,6 +133,12 @@
         <p>OpenAI 互換 API・Swagger UI。モデル一覧とヘルス確認。</p>
       </a>
 
+      <a class="card" href="http://localhost:8079/" target="_blank" rel="noopener">
+        <h2>Llumen</h2>
+        <div class="port">:8079（既定・<code>--profile ui-llumen</code>）</div>
+        <p>軽量 Rust チャット UI。API は既定で LiteLLM（<code>LLUMEN_OPENAI_BASE</code> で変更可）。初回ログインは GitHub <code>pinkfuwa/llumen</code> の README を参照。</p>
+      </a>
+
       <a class="card" href="http://localhost:8080/" target="_blank" rel="noopener">
         <h2>Open WebUI</h2>
         <div class="port">:8080</div>
@@ -149,6 +155,12 @@
         <h2>rust-inference（llama-server）</h2>
         <div class="port">:9080（既定）</div>
         <p>OpenAI 互換 API はコンテナ内 <code>:8080</code>。ホスト公開ポートは <code>.env</code> の <code>RUST_INFERENCE_HOST_PORT</code> に合わせてください。</p>
+      </a>
+
+      <a class="card" href="http://localhost:4100/health" target="_blank" rel="noopener">
+        <h2>Rust 薄型 LLM ゲートウェイ</h2>
+        <div class="port">:4100（既定・<code>--profile rust-gateway</code>）</div>
+        <p>LiteLLM 代替 PoC の <code>llm-gateway-rust</code>。<code>/health</code> が <code>ok</code> ならプロセス生存。モデル一覧は <code>/v1/models</code>（Bearer に <code>LITELLM_MASTER_KEY</code>）。ポートは <code>LLM_GATEWAY_RUST_HOST_PORT</code> で変更可。</p>
       </a>
 
       <div class="card" style="cursor: default;">

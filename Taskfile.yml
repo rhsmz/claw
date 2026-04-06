@@ -17,6 +17,10 @@ vars:
   VANILLA_MODEL: "imperial-logic-high-v1"
   # Rust 管理 CLI
   MGMT_PATH: "./scripts/management"
+  # rust-inference スタブクレート（Docker 内の llama-server が本体）
+  RUST_INFERENCE_DIR: "./rust-inference"
+  # 薄型 OpenAI プロキシ（--profile rust-gateway）
+  LLM_GATEWAY_PROXY_DIR: "./llm-gateway-proxy"
 
 # =============================================================================
 # 帝国管理タスク (Imperial Tasks)
@@ -27,40 +31,140 @@ tasks:
     cmds:
       - task --list-all
 
+  help-stack:
+    desc: 初回起動の流れ（GGUF・rust-inference ビルド）を表示
+    cmds:
+      - 'echo "1) task setup（汎用）または WSL/Linux なら task setup-wsl — .env / ディレクトリ"'
+      - 'echo "2) GGUF を storage/rust-inference-models/ へ配置（task models-hint）"'
+      - 'echo "3) task build-rust-inference — 初回のみ長時間（SYCL ビルド）"'
+      - 'echo "4) task up — LiteLLM は rust-inference 健全後に起動"'
+      - 'echo "   WSL GPU: task wsl-check-intel-gpu → 必要なら task wsl-setup-gpu → SYCL rust-inference: task rust-inference-gpu-wsl（推奨）／OpenCL: task up-with-opencl-wsl"'
+      - 'echo "5) task test-smoke — コア疎通（profile 未起動は SKIP。全件必須は task test-smoke-strict）"'
+      - 'echo "任意: task build-llm-gateway-rust と docker compose --profile rust-gateway up -d（PoC。手順は docs/rust_gateway_openai_requirements.md）"'
+      - 'echo "Docker なし: task llm-gateway-dev のあとブラウザで http://127.0.0.1:4100/health"'
+      - 'echo "Llumen: task up のあと task up-with-llumen、http://localhost:8079（README 参照）"'
+
   # ---------------------------------------------------------------------------
   # 1. 建国・初期化 (Setup & Initialization)
   # ---------------------------------------------------------------------------
   setup:
     desc: 帝国の建国準備（環境変数・ディレクトリ・権限設定）
     summary: |
-      初期セットアップを全自動で行います。
+      OS に応じて Unix または Windows の手順のみが実行されます。
+      WSL の Ubuntu 等では `task setup-wsl` も利用可能（PowerShell を経由しない）。
       1. .env ファイルの生成
-      2. 必要な作業ディレクトリの作成
-      3. DB初期化スクリプトの配置（docker-compose 起動時に自動実行）
+      2. 必要な作業ディレクトリの作成（storage/rust-inference-models 含む）
+      3. DB 初期化スクリプトは compose 起動時に postgres が実行
     cmds:
       - task: setup-unix
-        platforms: [linux, darwin]
       - task: setup-windows
-        platforms: [windows]
 
+  # platforms は各子タスク側に付与する（親 cmd の platforms は環境によって無視されることがある）
   setup-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
-      - cp -n .env.example .env || true
-      - cp -n mcp/gateway.env.example mcp/gateway.env || true
+      # GNU cp 9+ は --update=none（-n の非移植警告を避ける）。macOS 等は cp -n にフォールバック
+      - bash -c 'cp --update=none .env.example .env 2>/dev/null || cp -n .env.example .env || true'
+      - bash -c 'cp --update=none mcp/gateway.env.example mcp/gateway.env 2>/dev/null || cp -n mcp/gateway.env.example mcp/gateway.env || true'
       - mkdir -p prompts skills storage/postgres storage/rust-inference-models mcp/vault wiki/notion wiki/confluence
       - echo "建国準備完了。各 .env にAPIキーを入力後、'task up' を実行してください。"
 
   setup-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/task-setup-windows.ps1
+
+  setup-wsl:
+    desc: WSL / Linux での初回準備（bash 用。PowerShell セットアップは実行しない）
+    platforms: [linux]
+    summary: |
+      Windows 側の `task.exe` ではなく、WSL の Ubuntu 等で `task` を実行しているときに使います。
+      リポジトリが /mnt/c/... にあっても問題ありません。完了後は `task help-stack` で起動手順を確認してください。
+    cmds:
+      - task: setup-unix
+      # cmd の値はクォート必須（未クォートだと echo 文内の "WSL:" のコロンで YAML が壊れる）
+      - cmd: 'echo "WSL: Docker は Docker Desktop の WSL 統合または Linux 版 Docker で動かす（docker compose version で確認）。"'
+      - cmd: 'echo "WSL: GPU デバイスは先に task wsl-setup-gpu（/dev/dri + /dev/dxg 確認）。OpenCL は task up-with-opencl-wsl。GGUF は storage/rust-inference-models/ へ。"'
+
+  wsl-setup-gpu:
+    desc: WSL2 で /dev/dri（vgem）を用意し /dev/dxg を確認（Docker・opencl より先。sudo 要）
+    summary: |
+      Linux（WSL 内）で task / bash するか、Windows から task すると WSL 経由で同スクリプトが走ります。
+      再起動後も vgem を自動ロード: PERSIST_VGEM=1 task wsl-setup-gpu（/etc/modules に追記）。
+    cmds:
+      - task: wsl-setup-gpu-unix
+      - task: wsl-setup-gpu-windows
+
+  wsl-setup-gpu-unix:
+    platforms: [linux]
+    internal: true
+    cmds:
+      - bash scripts/wsl-setup-gpu.sh
+
+  wsl-setup-gpu-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/wsl-setup-gpu-from-windows.ps1
+
+  wsl-check-intel-gpu:
+    desc: WSL で Intel GPU（/dev/dri・dxg・clinfo）を確認し Docker 接続手順を表示
+    cmds:
+      - task: wsl-check-intel-gpu-unix
+      - task: wsl-check-intel-gpu-windows
+
+  wsl-check-intel-gpu-unix:
+    platforms: [linux]
+    internal: true
+    cmds:
+      - bash scripts/check-wsl-intel-gpu.sh
+
+  wsl-check-intel-gpu-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/wsl-check-intel-gpu-from-windows.ps1
+
+  debug-opencl-container:
+    desc: opencl-inference 内の clinfo・ICD・デバイスを表示（WSL・profile opencl-wsl 起動後）
+    cmds:
+      - task: debug-opencl-container-unix
+      - task: debug-opencl-container-windows
+
+  debug-opencl-container-unix:
+    platforms: [linux, darwin]
+    internal: true
+    cmds:
+      - bash scripts/debug-opencl-container.sh
+
+  debug-opencl-container-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/debug-opencl-container-from-windows.ps1
+
+  docker-wsl-fix-creds-store:
+    desc: WSL/Linux で Docker Hub pull/build の error getting credentials を緩和（~/.docker/config.json をバックアップして credsStore 除去）
+    platforms: [linux, darwin]
+    cmds:
+      - bash scripts/docker-wsl-fix-creds-store.sh
+
+  check-docker-gpu:
+    desc: Docker 内の GPU 認識を確認（opencl-inference ログ・/dev/dxg パススルー・rust-inference）
+    platforms: [linux, darwin]
+    cmds:
+      - bash scripts/check-docker-gpu.sh
 
   # ---------------------------------------------------------------------------
   # 2. 進軍・戦線展開 (Infrastructure Control)
   # ---------------------------------------------------------------------------
   up:
     desc: コアスタックを起動（Postgres / Redis / rust-inference / LiteLLM / MCP / Stack Portal）
+    summary: |
+      rust-inference は GGUF が無いとヘルスが通らず、LiteLLM も待機で止まります。
+      初回は先に task build-rust-inference を実行してください（詳細: task help-stack）。
     cmds:
       - task: stack-up
 
@@ -68,17 +172,17 @@ tasks:
     internal: true
     cmds:
       - task: stack-up-unix
-        platforms: [linux, darwin]
       - task: stack-up-windows
-        platforms: [windows]
 
   stack-up-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
       - bash scripts/docker-compose-stack.sh up -d --wait
       - task: status
 
   stack-up-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 up -d --wait
@@ -93,17 +197,17 @@ tasks:
     internal: true
     cmds:
       - task: stack-up-with-zeroclaw-unix
-        platforms: [linux, darwin]
       - task: stack-up-with-zeroclaw-windows
-        platforms: [windows]
 
   stack-up-with-zeroclaw-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
       - bash scripts/docker-compose-stack.sh --profile zeroclaw up -d --wait
       - task: status
 
   stack-up-with-zeroclaw-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 --profile zeroclaw up -d --wait
@@ -118,20 +222,74 @@ tasks:
     internal: true
     cmds:
       - task: stack-up-with-ui-unix
-        platforms: [linux, darwin]
       - task: stack-up-with-ui-windows
-        platforms: [windows]
 
   stack-up-with-ui-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
       - bash scripts/docker-compose-stack.sh --profile ui up -d --wait
       - task: status
 
   stack-up-with-ui-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 --profile ui up -d --wait
+      - task: status
+
+  up-with-llumen:
+    desc: Llumen 軽量 Rust UI（:8079 既定）を起動（--profile ui-llumen。LiteLLM 待ち後に起動）
+    cmds:
+      - task: stack-up-with-llumen
+
+  stack-up-with-llumen:
+    internal: true
+    cmds:
+      - task: stack-up-with-llumen-unix
+      - task: stack-up-with-llumen-windows
+
+  stack-up-with-llumen-unix:
+    platforms: [linux, darwin]
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-stack.sh --profile ui-llumen up -d --wait
+      - task: status
+
+  stack-up-with-llumen-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 --profile ui-llumen up -d --wait
+      - task: status
+
+  up-with-opencl-wsl:
+    desc: コア + opencl-inference（WSL2 の /dev/dxg・/dev/dri・/usr/lib/wsl/lib）。DEFAULT_MODEL を imperial-*-wsl-oc に
+    summary: |
+      事前に task wsl-setup-gpu（WSL で /dev/dri 用意）と task build-opencl-inference。
+      litellm_config.yaml の imperial-*-wsl-oc が opencl-inference:8080 を参照します。
+      ネイティブ Linux では /usr/lib/wsl/lib が無いためマウントに失敗します。
+    cmds:
+      - task: stack-up-with-opencl-wsl
+
+  stack-up-with-opencl-wsl:
+    internal: true
+    cmds:
+      - task: stack-up-with-opencl-wsl-unix
+      - task: stack-up-with-opencl-wsl-windows
+
+  stack-up-with-opencl-wsl-unix:
+    platforms: [linux, darwin]
+    internal: true
+    cmds:
+      - bash scripts/docker-compose-stack.sh --profile opencl-wsl up -d --wait
+      - task: status
+
+  stack-up-with-opencl-wsl-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 --profile opencl-wsl up -d --wait
       - task: status
 
   up-full:
@@ -143,32 +301,65 @@ tasks:
     internal: true
     cmds:
       - task: stack-up-full-unix
-        platforms: [linux, darwin]
       - task: stack-up-full-windows
-        platforms: [windows]
 
   stack-up-full-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
       - bash scripts/docker-compose-stack.sh --profile ui --profile zeroclaw up -d --wait
       - task: status
 
   stack-up-full-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 --profile ui --profile zeroclaw up -d --wait
       - task: status
 
   test:
-    desc: リポジトリ検証（compose config + imperial-management の cargo test）
+    desc: リポジトリ検証（compose config + Rust クレートの test / check）
     cmds:
       - task: compose-validate
       - cargo test --manifest-path {{.MGMT_PATH}}/Cargo.toml
+      - cargo test --manifest-path {{.LLM_GATEWAY_PROXY_DIR}}/Cargo.toml
+      - cargo check --manifest-path {{.RUST_INFERENCE_DIR}}/Cargo.toml
 
   test-smoke:
-    desc: スタック HTTP スモーク（Docker 起動済み前提。WSL/macOS/Linux で bash 利用可）
+    desc: スタック HTTP スモーク（Docker 起動済み前提）
+    cmds:
+      - task: test-smoke-unix
+      - task: test-smoke-windows
+
+  test-smoke-unix:
+    platforms: [linux, darwin]
+    internal: true
     cmds:
       - bash scripts/stack-smoke-test.sh
+
+  test-smoke-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stack-smoke-test.ps1
+
+  test-smoke-strict:
+    desc: スモーク全項目必須（rust-gateway / ui / zeroclaw 等すべて起動済み想定。従来の厳密モード）
+    cmds:
+      - task: test-smoke-strict-unix
+      - task: test-smoke-strict-windows
+
+  test-smoke-strict-unix:
+    platforms: [linux, darwin]
+    internal: true
+    cmds:
+      - STACK_SMOKE_STRICT=1 bash scripts/stack-smoke-test.sh
+
+  test-smoke-strict-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:STACK_SMOKE_STRICT='1'; & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stack-smoke-test.ps1"
 
   compose-validate:
     desc: docker compose 定義の検証（環境変数展開と YAML）
@@ -187,19 +378,19 @@ tasks:
       - task: status
 
   pull:
-    desc: Compose サービスのイメージを更新取得（rust-inference は Dockerfile ビルド）
+    desc: Compose の pull 可能イメージを更新（rust-inference は Dockerfile のため task build-rust-inference）
     cmds:
       - task: compose-pull-unix
-        platforms: [linux, darwin]
       - task: compose-pull-windows
-        platforms: [windows]
 
   compose-pull-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
       - bash scripts/docker-compose-stack.sh pull
 
   compose-pull-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker-compose-stack.ps1 pull
@@ -242,11 +433,132 @@ tasks:
   # ---------------------------------------------------------------------------
   # 3. 兵装整備 (Model & Runtime Logistics)
   # ---------------------------------------------------------------------------
+  build-rust-inference:
+    desc: rust-inference イメージを docker build（初回は SYCL+llama.cpp で非常に時間がかかる）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} build rust-inference"
+
+  rebuild-rust-inference:
+    desc: rust-inference をキャッシュ無しで再ビルド（CMake/依存の不整合時）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} build --no-cache rust-inference"
+
+  # build 前に Hub で creds エラーなら: task docker-wsl-fix-creds-store（WSL のみ）
+  build-opencl-inference:
+    desc: opencl-inference イメージを docker build（llama.cpp OpenCL。初回は数分〜）
+    cmds:
+      - "{{.DOCKER_COMPOSE}} build opencl-inference"
+
+  # WSL + Intel: rust-inference SYCL GPU（/dev/dri + /dev/dxg + /usr/lib/wsl）。以降の compose も同じ -f を付けること
+  build-rust-inference-gpu-wsl:
+    desc: rust-inference を WSL+Intel GPU 向けにビルド（libggml-sycl 保持。初回は非常に重い）
+    platforms: [linux, windows]
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu-wsl.yml build rust-inference
+
+  rebuild-rust-inference-gpu-wsl:
+    desc: 上記をキャッシュ無しで再ビルド
+    platforms: [linux, windows]
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu-wsl.yml build --no-cache rust-inference
+
+  up-with-rust-inference-gpu-wsl:
+    desc: コアスタックを GPU 付き rust-inference（SYCL）で起動（WSL2+Intel 想定。先に build-rust-inference-gpu-wsl）
+    platforms: [linux, windows]
+    summary: |
+      docker-compose.rust-inference-gpu-wsl.yml を併用します。/usr/lib/wsl が無いネイティブ Linuxでは docker-compose.rust-inference-gpu.yml のみを使ってください。
+      ONEAPI_DEVICE_SELECTOR が不調なら .env で opencl:gpu を試してください。
+    cmds:
+      - task: stack-up-rust-inference-gpu-wsl
+
+  stack-up-rust-inference-gpu-wsl:
+    internal: true
+    platforms: [linux, windows]
+    cmds:
+      - task: stack-up-rust-inference-gpu-wsl-unix
+      - task: stack-up-rust-inference-gpu-wsl-windows
+
+  stack-up-rust-inference-gpu-wsl-unix:
+    platforms: [linux]
+    internal: true
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu-wsl.yml up -d --wait
+      - task: status
+
+  stack-up-rust-inference-gpu-wsl-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.rust-inference-gpu-wsl.yml up -d --wait
+      - task: status
+
+  rust-inference-gpu-wsl:
+    desc: GPU 用ビルド＋コア起動を連続実行（WSL+Intel・初回はビルドに大時間）
+    platforms: [linux, windows]
+    cmds:
+      - task: build-rust-inference-gpu-wsl
+      - task: up-with-rust-inference-gpu-wsl
+
+  build-llm-gateway-rust:
+    desc: llm-gateway-rust（Axum 薄型 OpenAI プロキシ）のイメージを docker build
+    cmds:
+      - "{{.DOCKER_COMPOSE}} build llm-gateway-rust"
+
+  llm-gateway-dev:
+    desc: ホストで llm-gateway-proxy を起動（ブラウザ検証用。/health は http://127.0.0.1:4100/health。上流は既定で :9080/v1）
+    dir: llm-gateway-proxy
+    env:
+      BIND_ADDR: "127.0.0.1:4100"
+      UPSTREAM_OPENAI_BASE: "http://127.0.0.1:9080/v1"
+    cmds:
+      - cargo run
+
   rust-inference-models-hint:
     desc: rust-inference 用 GGUF の置き場所を表示（Hugging Face 等から手動ダウンロード）
     cmds:
       - echo "GGUF を .env の RUST_INFERENCE_MODELS_DIR（既定 ./storage/rust-inference-models）へ配置し、compose を再起動してください。"
       - echo "単一ファイルに固定する場合は .env で LLAMA_MODEL_PATH=/app/models/<ファイル名> を指定（コンテナ内パス）。"
+
+  models-hint:
+    desc: rust-inference-models-hint の短いエイリアス
+    cmds:
+      - task: rust-inference-models-hint
+
+  models-download-gemma4-e2b-q8:
+    desc: HF から gemma-4-e2b-it-Q8_0.gguf（約5GB）を storage/rust-inference-models へ取得（要ネットワーク）
+    cmds:
+      - task: models-download-gemma4-e2b-q8-unix
+      - task: models-download-gemma4-e2b-q8-windows
+
+  models-download-gemma4-e2b-q8-unix:
+    platforms: [linux, darwin]
+    internal: true
+    cmds:
+      - bash scripts/download-hf-gguf.sh
+
+  models-download-gemma4-e2b-q8-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/download-hf-gguf.ps1
+
+  models-download-gemma4-e2b-all:
+    desc: HF から gemma-4-E2B-it の全 .gguf（Q8・F16・mmproj 等、合計約15GB級）を storage/rust-inference-models へ取得
+    cmds:
+      - task: models-download-gemma4-e2b-all-unix
+      - task: models-download-gemma4-e2b-all-windows
+
+  models-download-gemma4-e2b-all-unix:
+    platforms: [linux, darwin]
+    internal: true
+    cmds:
+      - ALL=1 bash scripts/download-hf-gguf.sh
+
+  models-download-gemma4-e2b-all-windows:
+    platforms: [windows]
+    internal: true
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/download-hf-gguf.ps1 -All
 
   hexa-rag-models-hint:
     desc: hexa-rag 用モデルは Ollama 廃止後、埋め込み・LLM を別途用意（README の RAG 節を参照）
@@ -312,11 +624,10 @@ tasks:
     desc: 一時ファイルとキャッシュの破棄
     cmds:
       - task: clean-unix
-        platforms: [linux, darwin]
       - task: clean-windows
-        platforms: [windows]
 
   clean-unix:
+    platforms: [linux, darwin]
     internal: true
     cmds:
       - rm -rf storage/postgres/*
@@ -324,6 +635,7 @@ tasks:
       - echo "帝国の全領域を浄化しました。"
 
   clean-windows:
+    platforms: [windows]
     internal: true
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/task-clean-windows.ps1

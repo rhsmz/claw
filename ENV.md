@@ -1,6 +1,6 @@
 # 環境変数と MCP 連携（`.env` / `mcp/gateway.env`）
 
-プロジェクト全体の秘密情報・接続情報は主に **ルートの `.env`** に置きます。MCP ツール向けの変数は **`mcp/gateway.env.example`** をテンプレートにした `mcp/gateway.env` にまとめる運用を推奨します（`task setup` で両方の雛形がコピーされます）。
+プロジェクト全体の秘密情報・接続情報は主に **ルートの `.env`** に置きます。MCP ツール向けの変数は **`mcp/gateway.env.example`** をテンプレートにした `mcp/gateway.env` にまとめる運用を推奨します（`task setup` または WSL/Linux では **`task setup-wsl`** で両方の雛形がコピーされます）。
 
 スタックの全体像・起動手順は [README.md](README.md)、MCP ゲートウェイとスキル対応の詳細は [mcp/README.md](mcp/README.md) を参照してください。
 
@@ -10,6 +10,8 @@
 
 Docker Compose V2 は、**プロジェクトルートの `.env`** を自動的に読み込み、`docker-compose.yml` 内の `${VAR}` 補間に使います。`Taskfile.yml` も `dotenv: ['.env']` で同じファイルを参照します。
 
+WSL で **`error getting credentials`** が出る場合は **`task docker-wsl-fix-creds-store`**（`~/.docker/config.json` のバックアップと `credsStore` 除去）。詳細は [README.md](README.md) のトラブルシューティング。
+
 初回は次で作成します。
 
 ```bash
@@ -18,7 +20,7 @@ cp .env.example .env
 
 Windows（cmd）の例: `copy .env.example .env`
 
-または `task setup`（`.env` と `mcp/gateway.env` の雛形作成・ディレクトリ準備を含む）。
+または `task setup` / WSL では **`task setup-wsl`**（`.env` と `mcp/gateway.env` の雛形作成・ディレクトリ準備を含む。後者は PowerShell を呼ばない）。
 
 ### 1.1 `.env.example` に基づく変数一覧
 
@@ -31,10 +33,17 @@ Windows（cmd）の例: `copy .env.example .env`
 | LLM | `LITELLM_MASTER_KEY` | LiteLLM のマスターキー（ZeroClaw の `API_KEY` 等と揃える） |
 | | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` / `MISTRAL_API_KEY` | クラウドプロバイダ利用時 |
 | | `DEFAULT_MODEL` / `FALLBACK_MODEL` | 既定・フォールバックモデル（`litellm_config.yaml` の `model_name` と整合） |
-| | `RUST_INFERENCE_MODELS_DIR` | `rust-inference` にマウントする GGUF 置き場（既定 `./storage/rust-inference-models`） |
-| | `RUST_INFERENCE_HOST_PORT` | ホストから llama-server を叩くポート（既定 `9080`。コンテナ内は `8080`） |
-| | `RUST_INFERENCE_ONEAPI_VERSION` / `LLAMA_CPP_REF` / `GGML_SYCL_F16` | `rust-inference` イメージのビルド引数（上級者向け） |
+| | `RUST_INFERENCE_MODELS_DIR` | `rust-inference` / `opencl-inference` にマウントする GGUF 置き場（既定 `./storage/rust-inference-models`） |
+| | `RUST_INFERENCE_HOST_PORT` | ホストから SYCL llama-server を叩くポート（既定 `9080`） |
+| | `OPENCL_INFERENCE_HOST_PORT` | **`--profile opencl-wsl`** 時の OpenCL llama-server ホストポート（既定 `9081`）。Compose は **`/usr/lib/wsl` ツリー**と **`/dev/dxg`** を渡す（Intel [compute-runtime#625](https://github.com/intel/compute-runtime/issues/625)）。`/dev/dri` は vgem 等で用意（`task wsl-setup-gpu`） |
+| | `RUST_INFERENCE_ONEAPI_VERSION` / `LLAMA_CPP_REF` / `GGML_SYCL_F16` / `RUST_INFERENCE_KEEP_SYCL` | `rust-inference` イメージのビルド引数（`RUST_INFERENCE_KEEP_SYCL=1` で SYCL プラグインを残す。通常は GPU 用 compose オーバーライドで指定） |
+| | `LLM_GATEWAY_RUST_HOST_PORT` | **`--profile rust-gateway`** 時の `llm-gateway-rust` ホスト公開ポート（既定 `4100`）。詳細は [docs/rust_gateway_openai_requirements.md](docs/rust_gateway_openai_requirements.md) |
+| | `ONEAPI_DEVICE_SELECTOR` | oneAPI ランタイムのデバイス選択（**空にしない**。例: `level_zero:gpu`（Arc）、不調時は `opencl:gpu`） |
+| | `COMPOSE_FILE` | （任意）WSL 向け GPU オーバーライドを既定化する場合のファイル列（区切りは Linux/WSL で `:`、Windows ホストの `.env` では `;`）。`task rust-inference-gpu-wsl` と同じ組み合わせに揃える |
 | | `LLAMA_MODEL_PATH` / `N_GPU_LAYERS` / `LLAMA_EXTRA_ARGS` | コンテナ内 `llama-server` の挙動調整（任意） |
+| | `RUST_INFERENCE_DISABLE_SYCL_PLUGIN` | **`docker-compose.rust-inference-gpu-wsl.yml` 併用時**: `1` で `libggml-sycl` を外し **CPU のみ**（大型モデル + iGPU で SYCL 確保失敗する場合の既定）。SYCL GPU を試すとき `0` |
+| | `RUST_INFERENCE_GPU_WSL_NGL` | 同上 compose の `N_GPU_LAYERS`（未設定 **`-1`**。`.env` の `N_GPU_LAYERS` はこのファイルでは使わない） |
+| | `RUST_INFERENCE_WSL_ONEAPI_DEVICE` | 同上の `ONEAPI_DEVICE_SELECTOR`（未設定 **`opencl:gpu`**） |
 | DB / キャッシュ | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST` / `POSTGRES_PORT` | DB 接続（Compose 内ホスト名は `postgres`、コンテナ内ポートは常に `5432`） |
 | | `POSTGRES_HOST_PORT` | **ホストへ公開する** Postgres ポート（既定 `5432`。ホストで 5432 が使用中なら `5433` など） |
 | | `REDIS_URL` | Redis 接続 URL |
@@ -55,6 +64,8 @@ Windows（cmd）の例: `copy .env.example .env`
 | | `CONFLUENCE_API_TOKEN` / `CONFLUENCE_EMAIL` / `CONFLUENCE_URL` | Confluence（任意: 一度ローカルへ export する場合） |
 | 多言語サンドボックス | `COMPOSER_AUTH` / `CARGO_HOME` / `GOPATH` / `NODE_ENV` | ビルド・実行環境 |
 | Stack Portal | `STACK_PORTAL_PORT` | 静的ポータル（`stack-portal/`）のホスト公開ポート（既定 `8042`） |
+| Llumen（`--profile ui-llumen`） | `LLUMEN_HOST_PORT` | ホスト公開ポート（既定 `8079`。コンテナ内は `80`） |
+| | `LLUMEN_OPENAI_BASE` | OpenAI 互換 API のベース URL（既定 `http://litellm:4000/v1`。Rust ゲートウェイなら `http://llm-gateway-rust:4100/v1`） |
 
 **GitHub トークン名の対応**: `mcp/config.json` や `mcp/gateway.env.example` では `GITHUB_PERSONAL_ACCESS_TOKEN` という名前が使われます。ルート `.env` では **`GITHUB_PAT`** を設定し、Compose が MCP Gateway コンテナ内では `GITHUB_PERSONAL_ACCESS_TOKEN` として渡します。`mcp/gateway.env` に直接書く場合は **`GITHUB_PERSONAL_ACCESS_TOKEN`** で統一してください。
 

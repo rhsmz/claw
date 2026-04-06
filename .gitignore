@@ -8,6 +8,15 @@ scripts/management/target/
 rust-inference/target/
 rust-inference/Cargo.lock
 
+llm-gateway-proxy/target/
+
+# download-hf-gguf.sh が作成する Hugging Face 用 venv（PEP 668 回避）
+.venv-hf-download/
+
+# ローカル推論用 GGUF（大容量・Hugging Face から取得）
+storage/rust-inference-models/*.gguf
+storage/rust-inference-models/.cache/
+
 # Crew per-agent runtime artifacts — not committed (see crew/README.md, workflow_contract.md).
 # Templates under crew/_template/ stay tracked via negation rules.
 crew/*/work_logs/
